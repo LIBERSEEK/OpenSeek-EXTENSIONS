@@ -6,11 +6,11 @@
 
 目前支持小红书、抖音、快手和哔哩哔哩（B站）。
 
-## 图片反推（已整合 ImageLens）
+## 图透镜（已整合 ImageLens）
 
-同一个千寻助手插件现已支持网页图片反推提示词、右键识图、框选区域识图、中英文提示词、九维结构拆解及可选 AI 生图。
-点击插件首页「图片反推设置」，使用 BOFT.AI 登录或配置自己的视觉模型 API，再在网页图片上点击千寻图标并选择分析，或按 `Alt+Shift+S` 框选分析。
-原有小红书、抖音、快手采集功能继续保留。安装、权限、上游来源见 [图片反推说明](docs/image-lens.md)。
+同一个千寻助手插件现已支持识别网页图片生成提示词、右键识图、区域框选、中英文提示词、九维结构拆解及可选 AI 生图。
+点击插件弹窗右上角的设置按钮，使用 BOFT.AI 登录或配置自己的 API Key；之后在网页图片上点击千寻图标即可识别，或按 `Alt+Shift+S`（Mac 为 `⌥⇧S`）框选区域。
+原有小红书、抖音、快手、B站采集功能继续保留。安装、权限、上游来源见 [图透镜说明](docs/image-lens.md)。
 
 ## 仓库与分支
 
@@ -18,7 +18,7 @@
 
 - `origin`：本仓库；`develop` 用于日常开发，`master` 用于稳定版本。
 - `upstream`：[iszhouhua/social-media-copilot](https://github.com/iszhouhua/social-media-copilot)，保留 `upstream/main` 用于同步原采集功能。
-- 图片反推整合自 [ImageLens](https://github.com/kevinchin12/ImageLens)，保留 MIT 许可证和上游版权声明；项目原有 GPL-3.0 许可证继续适用。
+- 图透镜整合自 [ImageLens](https://github.com/kevinchin12/ImageLens)，保留 MIT 许可证和上游版权声明；项目原有 GPL-3.0 许可证继续适用。
 - 同步上游前先提交或保存本地工作，再在 `develop` 运行 `git fetch upstream` 和 `git merge upstream/main`，处理冲突并验证后纳入稳定版本。
 
 ## 支持的采集功能
@@ -105,9 +105,9 @@ pnpm dev
 
 ## BOFT.AI 统一配置
 
-设置页点击「使用 BOFT.AI 登录」，在 BOFT 授权窗口确认后，识图与生图自动切换到 BOFT.AI，共用当前扩展的 AUTO Key。也可展开「改用 API Key 配置」手动填写密钥，然后分别选择 BOFT.AI。
+设置页顶部点击「使用 BOFT.AI 登录」，在 BOFT 授权窗口确认后，识图与生图自动切换到 BOFT.AI，共用当前扩展的 AUTO Key。也可展开「使用自己的 API Key」，服务商选择 BOFT.AI 后手动填写密钥。
 
-「读取可用模型」会读取当前账号的 `/v1/models`；可用列表不保证每个模型都有视觉输入或图片输出能力。识图默认 `gemini-3.8-flash`，生图默认 `gemini-nano-banana-2.1`，请按账号权限选择。Gemini 生图走 `/v1beta/models/...:generateContent`，其他图片模型走 `/v1/images/generations`。
+「高级 → 模型」中的「读取可用模型」会读取当前账号的 `/v1/models`；可用列表不保证每个模型都有视觉输入或图片输出能力。识图默认 `gemini-3.8-flash`，生图默认 `gemini-nano-banana-2.1`，请按账号权限选择。Gemini 生图走 `/v1beta/models/...:generateContent`，其他图片模型走 `/v1/images/generations`。
 
 「断开连接」删除本机授权凭据。需要撤销服务端 AUTO Key 时，请到 BOFT.AI 管理；账号重新连接且本机密钥丢失时，会恢复当前扩展客户端绑定的密钥。
 

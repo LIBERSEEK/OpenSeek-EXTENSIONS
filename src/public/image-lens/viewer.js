@@ -15,7 +15,7 @@ async function init() {
   currentSettings = await readSettings();
   applyStaticTranslations();
 
-  const payload = await readViewerPayload();
+  const payload = await readViewerPayload().catch(() => null);
 
   if (!payload) {
     promptEl.textContent = t("viewerMissingPayload");
@@ -25,6 +25,9 @@ async function init() {
   currentPayload = payload;
   promptEl.textContent = payload.prompt || t("viewerPromptMissing");
   renderImages(payload.images || []);
+  // Both actions stay disabled until there is something to copy or save.
+  copyPromptButton.disabled = !payload.prompt;
+  downloadImagesButton.disabled = !payload.images?.length;
 }
 
 copyPromptButton.addEventListener("click", async () => {
@@ -67,7 +70,7 @@ function renderImages(images) {
     .map((image, index) => {
       const src = `data:${image.mimeType || "image/png"};base64,${image.base64Data}`;
       return `
-        <article class="glass card">
+        <article class="card">
           <img src="${escapeHtml(src)}" alt="generated ${index + 1}" />
         </article>
       `;

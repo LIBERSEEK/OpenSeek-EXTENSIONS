@@ -1,30 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="../icon/32.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Lens Viewer</title>
+    <title>图透镜结果</title>
     <link rel="stylesheet" href="./viewer.css" />
   </head>
   <body>
     <main class="page">
       <header class="topbar">
         <div class="brand">
-          <span class="logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z" /></svg>
-          </span>
-          <strong id="viewer-eyebrow">Image Lens</strong>
+          <img src="../icon/48.png" width="26" height="26" alt="" />
+          <strong id="viewer-eyebrow">千寻助手</strong>
         </div>
         <div class="actions">
-          <button id="copy-prompt" class="btn" type="button">Copy Prompt</button>
-          <button id="download-images" class="btn btn-primary" type="button">Download Images</button>
+          <button id="copy-prompt" class="btn" type="button" disabled>复制提示词</button>
+          <button id="download-images" class="btn btn-primary" type="button" disabled>下载图片</button>
         </div>
       </header>
 
       <section class="prompt-card">
-        <h1 id="viewer-heading">Prompt</h1>
-        <p id="prompt" class="prompt">Loading...</p>
+        <h1 id="viewer-heading">提示词</h1>
+        <p id="prompt" class="prompt">载入中…</p>
       </section>
 
       <section id="gallery" class="gallery"></section>

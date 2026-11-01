@@ -269,6 +269,33 @@ test('editable analysis instructions keep the output contract and language prefe
   }
 });
 
+test('page settings expose readiness and the hover entry, never credentials', async () => {
+  registerImageLensBackground();
+  const menus = [];
+  chrome.contextMenus.create = item => { menus.push(item); };
+  let page = await send('get-settings', undefined, 'content-script');
+  assert.equal(page.data.analysisReady, false);
+  assert.equal(page.data.hoverButtonEnabled, true);
+  await send('save-settings', { promptProvider: 'gemini', promptApiKey: 'gemini-secret', hoverButtonEnabled: false });
+  page = await send('get-settings', undefined, 'content-script');
+  assert.equal(page.data.analysisReady, true);
+  assert.equal(page.data.hoverButtonEnabled, false);
+  assert.equal(JSON.stringify(page).includes('secret'), false);
+  // A Gemini key does not make BOFT.AI ready; the BOFT key does.
+  await send('save-settings', { promptProvider: 'boft' });
+  assert.equal((await send('get-settings', undefined, 'content-script')).data.analysisReady, false);
+  await send('save-settings', { promptProvider: 'boft', boftApiKey: 'boft-secret' });
+  page = await send('get-settings', undefined, 'content-script');
+  assert.equal(page.data.analysisReady, true);
+  assert.equal(page.data.hoverButtonEnabled, false, 'saves without the field keep the user choice');
+  // Each place gets one Image Lens item, so Chrome needs no submenu.
+  const [analyze, region] = menus.slice(-2);
+  assert.deepEqual(analyze.contexts, ['page', 'image', 'link', 'video', 'frame']);
+  assert.deepEqual(region.contexts, ['selection']);
+  assert.equal(analyze.title, '图透镜：识别图片');
+  assert.equal(region.title, '图透镜：区域框选');
+});
+
 test('custom analysis configuration persists, resets, validates length, and stays options-only', async () => {
   registerImageLensBackground();
   const initial = await send('get-settings');

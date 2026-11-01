@@ -1,6 +1,6 @@
 import { ToolMenu } from '@/components/common/tool-menu';
 import { CopyButton } from '@/components/copy/copy-button';
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { defineSocialMediaCopilotUi } from '@/utils/ui';
 import { toast } from 'sonner';
 import { videoDetail } from '../api';
@@ -28,29 +28,38 @@ const Component = () => {
     };
     const run = (action: () => Promise<unknown>) => { void action().catch(error => toast.error(error.message || '操作失败，请刷新B站页面后重试')); };
 
+    // Downloads share one submenu, the same way copying does.
     return <ToolMenu>
-        <DropdownMenuItem onSelect={() => run(async () => {
-            const part = Number(new URL(pageUrl).searchParams.get('p') || 1);
-            const files = await videoDownloadOptions(await getVideo(), part);
-            for (const file of files) await sendMessage('download', file);
-            toast.success('当前分P已加入下载队列，清晰度见文件名');
-        })}>下载当前分P视频</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => run(async () => {
-            const files = await videoDownloadOptions(await getVideo());
-            for (const file of files) await sendMessage('download', file);
-            toast.success(`${files.length}个MP4文件已加入下载队列`);
-        })}>下载全部分P视频</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => run(() => sendMessage('openTaskDialog', { name: 'post', urls: [pageUrl] }))}>导出当前视频数据</DropdownMenuItem>
+        <DropdownMenuSub>
+            <DropdownMenuSubTrigger>下载</DropdownMenuSubTrigger>
+            <DropdownMenuPortal container={document.shadow.body}>
+                <DropdownMenuSubContent collisionPadding={12} className="min-w-[180px]">
+                    <DropdownMenuItem onSelect={() => run(async () => {
+                        const part = Number(new URL(pageUrl).searchParams.get('p') || 1);
+                        const files = await videoDownloadOptions(await getVideo(), part);
+                        for (const file of files) await sendMessage('download', file);
+                        toast.success('当前分P已加入下载队列，清晰度见文件名');
+                    })}>当前分P视频</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => run(async () => {
+                        const files = await videoDownloadOptions(await getVideo());
+                        for (const file of files) await sendMessage('download', file);
+                        toast.success(`${files.length}个MP4文件已加入下载队列`);
+                    })}>全部分P视频</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => run(async () => {
+                        const detail = await getVideo();
+                        for (const file of videoMedia(detail)) await sendMessage('download', file);
+                        toast.success('封面已加入下载');
+                    })}>视频封面</DropdownMenuItem>
+                </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+        </DropdownMenuSub>
+        <CopyButton submenu getData={getVideo} options={[{ label: 'BV号', value: 'bvid' }, { label: '视频标题', value: 'title' }, { label: '视频简介', value: 'desc' }, { label: 'UP主昵称', value: 'owner.name' }]}>复制视频信息</CopyButton>
+        {/* The video is already known, so the export starts without a form. */}
+        <DropdownMenuItem onSelect={() => run(() => sendMessage('openTaskDialog', { name: 'post', urls: [pageUrl], autoStart: true }))}>导出视频数据</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => run(async () => {
             const detail = await getVideo();
             await sendMessage('openTaskDialog', { name: 'post-comment', post: { postId: detail.bvid, title: detail.title, commentCount: detail.stat.reply, url: `https://www.bilibili.com/video/${detail.bvid}` } });
-        })}>导出视频评论</DropdownMenuItem>
-        <CopyButton submenu getData={getVideo} options={[{ label: 'BV号', value: 'bvid' }, { label: '视频标题', value: 'title' }, { label: '视频简介', value: 'desc' }, { label: 'UP主昵称', value: 'owner.name' }]}>复制视频信息</CopyButton>
-        <DropdownMenuItem onSelect={() => run(async () => {
-            const detail = await getVideo();
-            for (const file of videoMedia(detail)) await sendMessage('download', file);
-            toast.success('封面已加入下载');
-        })}>下载视频封面</DropdownMenuItem>
+        })}>导出评论</DropdownMenuItem>
     </ToolMenu>;
 };
 

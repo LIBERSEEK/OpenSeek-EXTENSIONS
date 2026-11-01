@@ -45,7 +45,7 @@ const Component = (props: {
 
   return (<ToolMenu>
     <CopyButton submenu options={copyOptions} getData={getUserInfo}>复制博主信息</CopyButton>
-    <DropdownMenuItem onSelect={handlerOpenExportDialog}>导出笔记数据</DropdownMenuItem>
+    <DropdownMenuItem onSelect={handlerOpenExportDialog}>导出博主笔记</DropdownMenuItem>
   </ToolMenu>);
 };
 

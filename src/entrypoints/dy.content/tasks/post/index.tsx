@@ -47,7 +47,7 @@ const Component = (props: TaskDialogProps) => {
                 </form>
             </Form>
             <DialogFooter>
-                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">开始</Button>
+                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">导出</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>);

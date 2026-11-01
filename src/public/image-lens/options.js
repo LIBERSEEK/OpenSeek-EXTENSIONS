@@ -55,7 +55,10 @@ async function init() {
   form.addEventListener("input", handleFormInput);
   form.addEventListener("change", handleFormChange);
   form.addEventListener("click", handleFormClick);
-  document.getElementById('boft-connect').addEventListener('click', () => runBoftAction('boft-connect'));
+  // Already signed in but using another service: switch back without signing in again.
+  document.getElementById('boft-connect').addEventListener('click', () => (
+    currentSettings?.boftAccount?.connected && promptProviderField.value !== 'boft' ? useBoftProvider() : runBoftAction('boft-connect')
+  ));
   document.getElementById('boft-disconnect').addEventListener('click', () => runBoftAction('boft-disconnect'));
   document.getElementById('boft-models').addEventListener('click', () => runBoftAction('boft-models'));
   docButton.addEventListener("click", openDocs);
@@ -174,6 +177,7 @@ async function saveSettings(overrides = {}) {
     analysisInstructions: analysisInstructionsField.value.trim() === defaultAnalysisInstructions.trim()
       ? "" : analysisInstructionsField.value.trim(),
     autoAnalyze: getField("autoAnalyze")?.checked || false,
+    hoverButtonEnabled: getField("hoverButtonEnabled")?.checked || false,
     enableChineseRecognition: getField("enableChineseRecognition")?.checked || false,
     imageGenerationEnabled: getField("imageGenerationEnabled")?.checked || false,
     imageApiKey: String(formData.get(separate ? "imageApiKey" : "promptApiKey") || ""),
@@ -267,7 +271,6 @@ function handleSeparateImageConnectionChange() {
     if (independentImageDraft) {
       hydrateImageFields(independentImageDraft.provider, independentImageDraft.profile);
     }
-    document.getElementById("image-connection-settings").open = true;
     currentSettings = { ...(currentSettings || {}), imageProvider: imageProviderField.value };
   } else {
     const provider = imageProviderField.value;
@@ -290,11 +293,10 @@ function syncConnectionUI() {
   const imageProvider = separate ? imageProviderField.value : promptProvider;
   const usesBoft = promptProvider === "boft" || (imageGenerationEnabledField.checked && imageProvider === "boft");
   document.getElementById("image-connection-fields").hidden = !separate;
-  document.getElementById("boft-account").hidden = !usesBoft;
+  // The BOFT.AI row is always shown as the easy path; its manual key only
+  // matters while BOFT.AI is in use without a signed-in account.
+  document.getElementById("boft-key-row").hidden = !usesBoft || Boolean(currentSettings?.boftAccount?.connected);
   document.getElementById("boft-models").hidden = !usesBoft;
-  document.getElementById("prompt-advanced").hidden = promptProvider === "boft";
-  setText("connection-description", t(separate ? "separateConnectionDescription" : "sharedConnectionDescription"));
-  setText("image-connection-summary", t(separate ? "imageConnectionSeparate" : "imageConnectionShared"));
 }
 
 function hydrateForm(settings) {
@@ -339,9 +341,12 @@ function hydrateForm(settings) {
   separateImageConnectionField.checked = settings.imageConnectionMode === "separate" ||
     (settings.imageConnectionMode !== "shared" && !sameConnection);
   independentImageDraft = null;
-  document.getElementById("image-connection-settings").open = separateImageConnectionField.checked;
-  document.getElementById("prompt-advanced").open = getField("promptBaseUrl").value !== getProviderBaseUrlPlaceholder(promptProviderField.value);
-  document.getElementById("boft-manual").open = Boolean(settings.boftApiKey && !settings.boftAccount?.connected);
+  setCheckboxValue("hoverButtonEnabled", settings.hoverButtonEnabled !== false);
+  // Show the own-key fields only to people who already use their own key.
+  const provider = settings.promptProvider || "gemini";
+  document.getElementById("own-key").open = provider === "boft"
+    ? Boolean(settings.boftApiKey && !settings.boftAccount?.connected)
+    : Boolean(getField("promptApiKey").value);
 
   renderLanguageChoices();
   renderProviderChoices();
@@ -447,8 +452,11 @@ function applyLanguage(preference) {
   for (const [id, key] of Object.entries({
     "settings-title": "settingsTitle", "autosave-note": "autosaveNote",
     "connection-title": "connectionTitle", "models-title": "modelsTitle",
-    "custom-endpoint-label": "customEndpointLabel", "preferences-title": "preferencesTitle",
-    "about-label": "aboutLabel", "separate-image-connection-label": "separateImageConnectionLabel",
+    "preferences-title": "preferencesTitle", "advanced-title": "advancedTitle",
+    "interface-title": "interfaceTitle", "about-feedback": "feedbackLink",
+    "hover-button-enabled-label": "hoverButtonEnabledLabel", "hover-button-enabled-note": "hoverButtonEnabledNote",
+    "image-generation-enabled-note": "imageGenerationEnabledNote",
+    "separate-image-connection-label": "separateImageConnectionLabel",
     "separate-image-connection-note": "separateImageConnectionNote"
   })) setText(id, translator.t(key));
   for (const [id, key] of Object.entries({
@@ -459,7 +467,6 @@ function applyLanguage(preference) {
   syncAnalysisInstructionsState();
   setText("about-version-label", translator.t("aboutVersion"));
   setText("about-privacy", translator.t("aboutPrivacy"));
-  setText("about-credit", translator.t("panelCredit"));
   setText("ui-language-label", translator.t("languageLabel"));
   setText("prompt-provider-label", translator.t("promptProviderLabel"));
   setText("prompt-base-url-label", translator.t("promptBaseUrlLabel"));
@@ -500,6 +507,7 @@ function applyLanguage(preference) {
 
 function syncPromptProviderUI(provider) {
   getField('promptApiKey').closest('.row').hidden = provider === 'boft';
+  document.getElementById("prompt-base-url-row").hidden = provider === 'boft';
   getField('promptBaseUrl').readOnly = provider === 'boft';
   const translator = globalThis.ImageLensI18n.createTranslator(currentLanguagePreference);
   setText("prompt-api-key-label", getPromptApiKeyLabel(provider, translator));
@@ -707,24 +715,42 @@ async function sendMessage(message) {
 }
 
 
+// The BOFT.AI row says what the extension uses now and offers one next step.
 function renderBoftAccount() {
   const account = currentSettings?.boftAccount;
-  setText('boft-description', t('boftDescription'));
-  setText('boft-account-status', account?.connected ? t('boftConnected', { email: account.email }) : t(currentSettings?.boftApiKey ? 'boftManualConfigured' : 'boftDisconnected'));
-  setText('boft-connect', t(account?.connected ? 'boftReconnect' : 'boftLogin'));
+  const connected = Boolean(account?.connected);
+  const active = promptProviderField?.value === "boft";
+  const ownKey = !active && Boolean(getField("promptApiKey")?.value);
+  let status;
+  if (active && connected) status = t('boftConnected', { email: account.email });
+  else if (active && currentSettings?.boftApiKey) status = t('boftManualConfigured');
+  else if (ownKey) status = t('boftInactive', { provider: getProviderLabel(promptProviderField.value) });
+  else status = t('boftDisconnected');
+  setText('boft-account-status', status);
+  setText('boft-connect', t(connected ? (active ? 'boftReconnect' : 'boftUse') : 'boftLogin'));
+  document.getElementById('boft-connect').classList.toggle('btn-primary', !(connected && active));
   setText('boft-disconnect', t('boftLogout'));
   setText('boft-models', t('boftLoadModels'));
   setText('boft-manual-label', t('boftManual'));
-  setText('boft-manual-note', t('boftManualNote'));
-  document.getElementById('boft-disconnect').hidden = !account?.connected;
-  document.getElementById('boft-manual').hidden = Boolean(account?.connected);
+  document.getElementById('boft-disconnect').hidden = !connected || !active;
+}
+
+function getProviderLabel(provider) {
+  if (provider === "boft") return "BOFT.AI";
+  return t(provider === "openai-compatible" ? "providerOpenAICompatible" : "providerGemini");
+}
+
+async function useBoftProvider() {
+  promptProviderField.value = "boft";
+  await handlePromptProviderChange();
+  renderBoftAccount();
 }
 
 async function runBoftAction(type) {
   if (boftActionRunning) return;
   boftActionRunning = true;
   const feedback = document.getElementById('boft-feedback');
-  const controls = document.querySelectorAll('#settings-form input, #settings-form select, #settings-form textarea, #settings-form button, .boft-account input, .boft-actions button');
+  const controls = document.querySelectorAll('#settings-form input, #settings-form select, #settings-form textarea, #settings-form button, .boft-actions button');
   try {
     clearTimeout(saveTimer);
     saveTimer = null;

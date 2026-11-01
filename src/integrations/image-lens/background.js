@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS = {
   customProxyToken: "",
   uiLanguage: "auto",
   autoAnalyze: true,
+  hoverButtonEnabled: true,
   enableChineseRecognition: true,
   aspectRatio: "1:1",
   imageCount: 1,
@@ -142,6 +143,10 @@ async function setupContextMenus() {
   const t = getSettingsTranslator({ uiLanguage }).t;
 
   await chrome.contextMenus.removeAll();
+  // One item per place, so the menu rarely needs a submenu. "Analyze" stays
+  // on plain page areas: the content script finds images under transparent
+  // overlays, CSS backgrounds and canvas there, and starts an area selection
+  // when it finds nothing. Selected text gets "select area" instead.
   chrome.contextMenus.create({
     id: CONTEXT_MENU_ANALYZE_IMAGE,
     title: t("contextMenuAnalyzeImage"),
@@ -150,7 +155,7 @@ async function setupContextMenus() {
   chrome.contextMenus.create({
     id: CONTEXT_MENU_SELECT_REGION,
     title: t("contextMenuSelectRegion"),
-    contexts: ["page", "image", "link", "video", "frame", "selection"]
+    contexts: ["selection"]
   });
 }
 
@@ -315,8 +320,19 @@ function migrateRetiredDefaultModels(settings) {
 async function getPageSettings() {
   const settings = await getSettings();
   // The page UI only needs preferences, never model credentials or account identity.
-  return Object.fromEntries(['uiLanguage', 'autoAnalyze', 'enableChineseRecognition',
-    'aspectRatio', 'imageCount', 'imageGenerationEnabled', 'imageProvider'].map(key => [key, settings[key]]));
+  return {
+    ...Object.fromEntries(['uiLanguage', 'autoAnalyze', 'hoverButtonEnabled', 'enableChineseRecognition',
+      'aspectRatio', 'imageCount', 'imageGenerationEnabled', 'imageProvider'].map(key => [key, settings[key]])),
+    // Lets the panel show its setup state before the user picks an image.
+    analysisReady: isAnalysisConfigured(settings)
+  };
+}
+
+// Mirrors the credential checks in analyzeImage without exposing them.
+function isAnalysisConfigured(settings) {
+  if (settings.apiMode === "proxy") return Boolean(settings.customProxyUrl);
+  if (settings.promptProvider === "boft") return Boolean(settings.boftAccount?.connected || settings.boftApiKey);
+  return Boolean(settings.promptApiKey);
 }
 
 async function saveSettings(payload) {
@@ -382,6 +398,7 @@ async function saveSettings(payload) {
     imageConnectionMode: ["auto", "shared", "separate"].includes(sanitized.imageConnectionMode)
       ? sanitized.imageConnectionMode : current.imageConnectionMode,
     uiLanguage: "uiLanguage" in sanitized ? sanitized.uiLanguage : current.uiLanguage || "auto",
+    hoverButtonEnabled: "hoverButtonEnabled" in sanitized ? sanitized.hoverButtonEnabled : current.hoverButtonEnabled !== false,
     providerProfiles,
     promptProviderProfiles,
     imageProviderProfiles,

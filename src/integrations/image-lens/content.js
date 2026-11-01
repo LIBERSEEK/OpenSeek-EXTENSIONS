@@ -3,10 +3,14 @@ export function initializeImageLens() {
   if (document.getElementById("pg-panel")) return;
 const imageCache = new Map();
 const RATIO_OPTIONS = ["1:1", "3:4", "4:3", "9:16", "16:9"];
-const DEFAULT_TRANSLATOR = globalThis.ImageLensI18n.createTranslator("auto");
 
 const MIN_SELECTION_SIZE = 16;
 const MIN_BACKGROUND_IMAGE_SIZE = 48;
+// The entry icon waits for the pointer to rest on an image, so it does not
+// flash while the pointer crosses an image-heavy page.
+const HOVER_DELAY = 300;
+const PANEL_CLOSE_DURATION = 140;
+const COPIED_FEEDBACK_DURATION = 1400;
 // Same order as SECTION_KEYS in prompt-analysis.js.
 const STRUCTURE_KEYS = [
   "subject",
@@ -23,9 +27,11 @@ const STRUCTURE_KEYS = [
 const state = {
   settings: null,
   hoverImage: null,
-  menuSource: null,
+  hoverTimer: 0,
   panelSource: null,
   panelOpen: false,
+  panelCloseTimer: 0,
+  restoreFocus: null,
   contextPoint: null,
   regionSelecting: false,
   toastTimer: null,
@@ -33,6 +39,11 @@ const state = {
   hoverFrame: 0,
   currentJob: null,
   panelData: createEmptyPanelData(),
+  panelError: "",
+  queuedSource: null,
+  copied: false,
+  copiedTimer: 0,
+  settingsRefreshTimer: 0,
   actionState: {
     analyze: false,
     generate: false
@@ -42,109 +53,88 @@ const state = {
 // Stroke icons drawn with currentColor so they follow the theme.
 const ICONS = {
   logo: `<img class="pg-brand-icon" src="${chrome.runtime.getURL("icon/48.png")}" alt="" />`,
-  settings: '<svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>',
+  more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-  refresh: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>',
-  wand: '<svg viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M3 21l9-9M12.2 6.2L11 5"/></svg>'
+  check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  wand: '<svg viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M3 21l9-9M12.2 6.2L11 5"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>'
 };
 
-// Width and height of the little shape drawn in each ratio button.
-const RATIO_SHAPES = {
-  "1:1": [14, 14],
-  "3:4": [12, 16],
-  "4:3": [16, 12],
-  "9:16": [10, 17],
-  "16:9": [18, 10]
-};
-
+// One click opens the panel: the image has only one action, and region
+// selection and settings have their own entry points.
 const hoverTrigger = document.createElement("button");
 hoverTrigger.id = "pg-hover-trigger";
 hoverTrigger.type = "button";
-hoverTrigger.title = DEFAULT_TRANSLATOR.t("panelHoverTitle");
 hoverTrigger.innerHTML = ICONS.logo;
-hoverTrigger.setAttribute("aria-haspopup", "menu");
-hoverTrigger.setAttribute("aria-expanded", "false");
-hoverTrigger.setAttribute("aria-controls", "pg-tool-menu");
 
-const toolMenu = document.createElement("div");
-toolMenu.id = "pg-tool-menu";
-toolMenu.hidden = true;
-toolMenu.setAttribute("role", "menu");
-toolMenu.innerHTML = `
-  <div class="pg-tools-label">千寻 · 图片工具</div>
-  <button type="button" role="menuitem" data-tool="analyze" tabindex="-1"></button>
-  <button type="button" role="menuitem" data-tool="region" tabindex="-1"></button>
-  <button type="button" role="menuitem" data-tool="settings" tabindex="-1"></button>
+// Lives outside the panel so the panel's scroll area cannot clip it.
+const moreMenu = document.createElement("div");
+moreMenu.id = "pg-more-menu";
+moreMenu.hidden = true;
+moreMenu.setAttribute("role", "menu");
+moreMenu.innerHTML = `
+  <button type="button" role="menuitem" data-menu="reanalyze" data-result tabindex="-1"><span class="pg-mark"></span><span></span></button>
+  <div class="pg-menu-sep" role="separator" data-result></div>
+  <button type="button" role="menuitemradio" data-menu="full" data-result tabindex="-1"><span class="pg-mark">${ICONS.check}</span><span></span></button>
+  <button type="button" role="menuitemradio" data-menu="short" data-result tabindex="-1"><span class="pg-mark">${ICONS.check}</span><span></span></button>
+  <div class="pg-menu-sep" role="separator" data-result></div>
+  <button type="button" role="menuitem" data-menu="settings" tabindex="-1"><span class="pg-mark"></span><span></span></button>
 `;
 
+// The panel shows one stage at a time (data-stage): setup, idle, analyzing,
+// ready or error. Controls that do nothing in a stage are not shown.
 const panel = document.createElement("aside");
 panel.id = "pg-panel";
+panel.tabIndex = -1;
+panel.dataset.stage = "idle";
 panel.innerHTML = `
   <div class="pg-shell">
     <header class="pg-header">
-      <div class="pg-brand">
-        <span class="pg-logo">${ICONS.logo}</span>
-        <strong id="pg-brand">${escapeHtml(DEFAULT_TRANSLATOR.t("appName"))}</strong>
-      </div>
-      <div class="pg-header-actions">
-        <button class="pg-icon-button" id="pg-open-options" type="button">${ICONS.settings}</button>
-        <button class="pg-icon-button" id="pg-close" type="button">${ICONS.close}</button>
-      </div>
-    </header>
-
-    <section class="pg-source">
       <img class="pg-thumb" id="pg-preview-image" alt="" />
       <div class="pg-source-meta">
         <strong id="pg-image-title"></strong>
         <span id="pg-image-url"></span>
       </div>
-      <button class="pg-icon-button" id="pg-analyze" type="button">${ICONS.refresh}</button>
-    </section>
+      <div class="pg-header-actions">
+        <button class="pg-icon-button" id="pg-more" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="pg-more-menu">${ICONS.more}</button>
+        <button class="pg-icon-button" id="pg-close" type="button">${ICONS.close}</button>
+      </div>
+    </header>
 
-    <div class="pg-toolbar">
-      <div class="pg-tabs" role="tablist">
-        <button class="pg-tab" id="pg-tab-prompt" type="button" role="tab"></button>
-        <button class="pg-tab" id="pg-tab-structure" type="button" role="tab"></button>
-      </div>
-      <div class="pg-seg">
-        <button id="pg-detail-full" type="button"></button>
-        <button id="pg-detail-short" type="button"></button>
-      </div>
-      <div class="pg-seg" id="pg-lang-seg">
-        <button id="pg-lang-zh" type="button">中</button>
-        <button id="pg-lang-en" type="button">EN</button>
-      </div>
+    <div class="pg-empty">
+      <p id="pg-empty-text"></p>
+      <button class="pg-btn pg-btn-primary" id="pg-empty-action" type="button"></button>
     </div>
 
-    <div class="pg-prompt-box">
-      <textarea class="pg-textarea" id="pg-prompt-input"></textarea>
-      <div class="pg-structure pg-hidden" id="pg-structure">
-        <div class="pg-structure-grid" id="pg-structure-grid"></div>
+    <div class="pg-result">
+      <div class="pg-prompt-box">
+        <textarea class="pg-textarea" id="pg-prompt-input" spellcheck="false"></textarea>
+        <div class="pg-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="pg-meta">
+          <span class="pg-status" id="pg-status" role="status" aria-live="polite"></span>
+          <div class="pg-seg" id="pg-lang-seg">
+            <button id="pg-lang-zh" type="button">中</button>
+            <button id="pg-lang-en" type="button">EN</button>
+          </div>
+        </div>
       </div>
-      <div class="pg-meta">
-        <span class="pg-status" id="pg-status"></span>
-        <span id="pg-char-count"></span>
-      </div>
-    </div>
 
-    <div class="pg-section-chips pg-hidden" id="pg-section-chips"></div>
+      <details class="pg-structure" id="pg-structure">
+        <summary><span class="pg-chevron">${ICONS.chevron}</span><span id="pg-structure-label"></span></summary>
+        <div class="pg-structure-list" id="pg-structure-list"></div>
+      </details>
 
-    <div class="pg-actions">
-      <button class="pg-btn pg-btn-primary" id="pg-copy" type="button">${ICONS.copy}<span id="pg-copy-label"></span></button>
-    </div>
+      <button class="pg-btn pg-btn-primary pg-copy" id="pg-copy" type="button"><span class="pg-copy-icon">${ICONS.copy}</span><span class="pg-copied-icon">${ICONS.check}</span><span id="pg-copy-label"></span></button>
 
-    <section class="pg-generate" id="pg-generate-section">
-      <div class="pg-generate-head">
-        <strong id="pg-generate-heading"></strong>
-        <span id="pg-generate-meta"></span>
-      </div>
-      <div class="pg-ratios" id="pg-ratios" role="radiogroup"></div>
-      <button class="pg-btn pg-btn-secondary" id="pg-generate" type="button">${ICONS.wand}<span id="pg-generate-label"></span></button>
-      <div class="pg-inline-preview" id="pg-inline-preview">
+      <section class="pg-generate" id="pg-generate-section">
+        <div class="pg-generate-row">
+          <select class="pg-ratio-select" id="pg-ratio"></select>
+          <button class="pg-btn pg-btn-secondary" id="pg-generate" type="button">${ICONS.wand}<span id="pg-generate-label"></span></button>
+        </div>
         <div class="pg-inline-grid" id="pg-inline-grid"></div>
-      </div>
-    </section>
+      </section>
+    </div>
   </div>
 `;
 
@@ -152,36 +142,30 @@ const toast = document.createElement("div");
 toast.id = "pg-toast";
 toast.setAttribute("role", "status");
 
-document.documentElement.append(hoverTrigger, toolMenu, panel, toast);
+document.documentElement.append(hoverTrigger, moreMenu, panel, toast);
 
 const els = {
   previewImage: panel.querySelector("#pg-preview-image"),
   imageTitle: panel.querySelector("#pg-image-title"),
   imageUrl: panel.querySelector("#pg-image-url"),
+  more: panel.querySelector("#pg-more"),
+  close: panel.querySelector("#pg-close"),
+  emptyText: panel.querySelector("#pg-empty-text"),
+  emptyAction: panel.querySelector("#pg-empty-action"),
   input: panel.querySelector("#pg-prompt-input"),
   status: panel.querySelector("#pg-status"),
-  charCount: panel.querySelector("#pg-char-count"),
-  analyze: panel.querySelector("#pg-analyze"),
-  copy: panel.querySelector("#pg-copy"),
-  copyLabel: panel.querySelector("#pg-copy-label"),
-  generate: panel.querySelector("#pg-generate"),
-  generateLabel: panel.querySelector("#pg-generate-label"),
-  generateMeta: panel.querySelector("#pg-generate-meta"),
-  close: panel.querySelector("#pg-close"),
-  openOptions: panel.querySelector("#pg-open-options"),
-  tabPrompt: panel.querySelector("#pg-tab-prompt"),
-  tabStructure: panel.querySelector("#pg-tab-structure"),
-  detailShort: panel.querySelector("#pg-detail-short"),
-  detailFull: panel.querySelector("#pg-detail-full"),
   langSeg: panel.querySelector("#pg-lang-seg"),
   langZh: panel.querySelector("#pg-lang-zh"),
   langEn: panel.querySelector("#pg-lang-en"),
   structure: panel.querySelector("#pg-structure"),
-  structureGrid: panel.querySelector("#pg-structure-grid"),
-  sectionChips: panel.querySelector("#pg-section-chips"),
+  structureLabel: panel.querySelector("#pg-structure-label"),
+  structureList: panel.querySelector("#pg-structure-list"),
+  copy: panel.querySelector("#pg-copy"),
+  copyLabel: panel.querySelector("#pg-copy-label"),
   generateSection: panel.querySelector("#pg-generate-section"),
-  ratios: panel.querySelector("#pg-ratios"),
-  inlinePreview: panel.querySelector("#pg-inline-preview"),
+  ratio: panel.querySelector("#pg-ratio"),
+  generate: panel.querySelector("#pg-generate"),
+  generateLabel: panel.querySelector("#pg-generate-label"),
   inlineGrid: panel.querySelector("#pg-inline-grid")
 };
 
@@ -191,7 +175,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       showToast(error.message || t("contextAnalyzeFailed"));
     });
   } else if (message?.type === "start-region-selection") {
-    startRegionSelection();
+    startRegionSelection().catch((error) => showToast(error.message || t("regionCaptureFailed")));
   } else {
     // Do not consume responses intended for the social-data content scripts.
     return false;
@@ -207,7 +191,7 @@ async function init() {
   state.panelData.detail = "full";
   state.panelData.language = getDefaultPromptLanguage();
   state.panelData.aspectRatio = state.settings.aspectRatio || "1:1";
-  renderRatioButtons();
+  renderRatioOptions();
   bindEvents();
   applyStaticTranslations();
   syncGenerationVisibility();
@@ -250,26 +234,19 @@ function applyStaticTranslations() {
   // Tells Chrome which language's glyph shapes to use for Chinese text.
   panel.lang = translator.messages.htmlLang;
   toast.lang = translator.messages.htmlLang;
-  setIconLabel(hoverTrigger, translator.t("toolsMenu"));
-  toolMenu.setAttribute("aria-label", translator.t("toolsMenu"));
-  toolMenu.querySelector(".pg-tools-label").textContent = translator.t("toolsMenu");
-  toolMenu.querySelector('[data-tool="analyze"]').textContent = translator.t("panelHoverTitle");
-  toolMenu.querySelector('[data-tool="region"]').textContent = translator.t("contextMenuSelectRegion");
-  toolMenu.querySelector('[data-tool="settings"]').textContent = translator.t("panelOpenSettings");
-  panel.querySelector("#pg-brand").textContent = translator.t("appName");
-  setIconLabel(els.openOptions, translator.t("panelOpenSettings"));
+  moreMenu.lang = translator.messages.htmlLang;
+  setIconLabel(hoverTrigger, translator.t("panelHoverTitle"));
+  setIconLabel(els.more, translator.t("panelMore"));
   setIconLabel(els.close, translator.t("panelClose"));
-  setIconLabel(els.analyze, translator.t("panelReanalyze"));
-  els.tabPrompt.textContent = translator.t("panelPromptTitle");
-  els.tabStructure.textContent = translator.t("panelStructureTab");
-  els.detailShort.textContent = translator.t("panelShort");
-  els.detailFull.textContent = translator.t("panelFull");
+  moreMenu.setAttribute("aria-label", translator.t("panelMore"));
+  for (const [action, key] of [["reanalyze", "panelReanalyze"], ["full", "panelFull"], ["short", "panelShort"], ["settings", "panelOpenSettings"]]) {
+    moreMenu.querySelector(`[data-menu="${action}"] span:last-child`).textContent = translator.t(key);
+  }
   els.input.placeholder = translator.t("panelPromptPlaceholder");
-  els.copyLabel.textContent = translator.t("panelCopy");
-  panel.querySelector("#pg-generate-heading").textContent = translator.t("panelGenerateTitle");
-  els.ratios.setAttribute("aria-label", translator.t("panelAspectRatio"));
-  els.generateLabel.textContent = translator.t("panelGenerate");
-  syncGenerateMeta();
+  els.structureLabel.textContent = translator.t("panelStructureTab");
+  els.ratio.setAttribute("aria-label", translator.t("panelAspectRatio"));
+  syncCopyButton();
+  syncActionState();
 }
 
 function setIconLabel(button, label) {
@@ -277,16 +254,76 @@ function setIconLabel(button, label) {
   button.setAttribute("aria-label", label);
 }
 
-function syncGenerateMeta() {
-  const provider =
-    state.settings?.imageProvider === "boft" ? "BOFT.AI" : state.settings?.imageProvider === "openai-compatible" ? t("providerOpenAICompatible") : t("providerGemini");
-  els.generateMeta.textContent = t("panelGenerateMeta", { provider, count: state.settings?.imageCount || 1 });
+// Copy confirms on the button itself instead of in a status line.
+function syncCopyButton() {
+  els.copy.disabled = !getCurrentPrompt().trim();
+  els.copy.classList.toggle("is-copied", state.copied);
+  els.copyLabel.textContent = t(state.copied ? "panelCopied" : "panelCopy");
+}
+
+function showCopied() {
+  state.copied = true;
+  syncCopyButton();
+  clearTimeout(state.copiedTimer);
+  state.copiedTimer = setTimeout(() => {
+    state.copied = false;
+    syncCopyButton();
+  }, COPIED_FEEDBACK_DURATION);
+}
+
+// Setup, idle and error share one message and one button.
+function syncEmptyState() {
+  const stage = panel.dataset.stage;
+  const awaitingRegion = state.panelSource?.kind === "region";
+  let text = "";
+  let action = "";
+  if (stage === "setup") {
+    [text, action] = [t("panelSetupTitle"), t("panelSetupAction")];
+  } else if (stage === "error") {
+    [text, action] = [state.panelError || t("panelActionError"), t("panelRetry")];
+  } else if (awaitingRegion) {
+    [text, action] = [t("panelRegionReadyTitle"), t("regionSelectAction")];
+  } else {
+    [text, action] = [t("panelIdleTitle"), t("panelAnalyzeAction")];
+  }
+  els.emptyText.textContent = text;
+  els.emptyText.classList.toggle("is-error", stage === "error");
+  els.emptyAction.textContent = action;
+}
+
+function handleEmptyAction() {
+  const stage = panel.dataset.stage;
+  if (stage === "setup") {
+    sendMessage({ type: "open-options" }).catch((error) => showToast(error.message));
+  } else if (state.panelSource?.kind === "region") {
+    startRegionSelection().catch((error) => showToast(error.message || t("regionCaptureFailed")));
+  } else {
+    analyzeCurrentImage({ force: true });
+  }
+}
+
+function setStage(stage) {
+  panel.dataset.stage = stage;
+  syncEmptyState();
+  syncMoreMenu();
+}
+
+// Result actions appear in the menu only once there is a result.
+function syncMoreMenu() {
+  const ready = panel.dataset.stage === "ready";
+  moreMenu.querySelectorAll("[data-result]").forEach((item) => {
+    item.hidden = !ready;
+  });
+  for (const detail of ["full", "short"]) {
+    moreMenu.querySelector(`[data-menu="${detail}"]`).setAttribute("aria-checked", String(state.panelData.detail === detail));
+  }
+  moreMenu.querySelector('[data-menu="reanalyze"]').disabled = state.actionState.analyze;
 }
 
 function bindEvents() {
   document.addEventListener("pointermove", handlePointerMove, true);
-  document.addEventListener("scroll", updateHoverButtonPosition, true);
-  window.addEventListener("resize", updateHoverButtonPosition);
+  document.addEventListener("scroll", handleViewportChange, true);
+  window.addEventListener("resize", handleViewportChange);
   document.addEventListener(
     "contextmenu",
     (event) => {
@@ -294,145 +331,172 @@ function bindEvents() {
     },
     true
   );
-
-  hoverTrigger.addEventListener("click", async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!toolMenu.hidden) {
-      closeToolMenu(true);
-      return;
-    }
-    if (!state.hoverImage) return;
-    state.menuSource = createImageSource(state.hoverImage);
-    toolMenu.hidden = false;
-    hoverTrigger.setAttribute("aria-expanded", "true");
-    const rect = hoverTrigger.getBoundingClientRect();
-    toolMenu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - toolMenu.offsetWidth - 8))}px`;
-    const top = rect.bottom + 6;
-    toolMenu.style.top = `${top + toolMenu.offsetHeight < window.innerHeight - 8 ? top : Math.max(8, rect.top - toolMenu.offsetHeight - 6)}px`;
-    toolMenu.querySelector('[role="menuitem"]').focus();
-  });
-
-  toolMenu.addEventListener("click", async (event) => {
-    const action = event.target.closest("[data-tool]")?.dataset.tool;
-    if (!action) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const source = state.menuSource;
-    closeToolMenu();
-    try {
-      if (action === "analyze" && source) await openPanelForSource(source);
-      else if (action === "region") startRegionSelection();
-      else if (action === "settings") await sendMessage({ type: "open-options" });
-    } catch (error) {
-      showToast(error.message || t("contextAnalyzeFailed"));
-    }
-  });
-  toolMenu.addEventListener("keydown", (event) => {
-    const buttons = [...toolMenu.querySelectorAll('[role="menuitem"]')];
-    const index = buttons.indexOf(document.activeElement);
-    if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-      event.preventDefault();
-      event.stopPropagation();
-      const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
-      buttons[next].focus();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      closeToolMenu(true);
-    } else if (event.key === "Tab") {
-      closeToolMenu(true);
-    }
-  });
   document.addEventListener("pointerdown", (event) => {
-    if (!toolMenu.contains(event.target) && !hoverTrigger.contains(event.target)) closeToolMenu();
+    if (!moreMenu.contains(event.target) && !els.more.contains(event.target)) closeMoreMenu();
   }, true);
-  document.addEventListener("scroll", () => closeToolMenu(), true);
-  window.addEventListener("resize", () => closeToolMenu());
+  // Settings usually change in the options tab; pick them up on return.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") scheduleSettingsRefresh();
+  });
+  window.addEventListener("focus", scheduleSettingsRefresh);
 
+  hoverTrigger.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const image = state.hoverImage;
+    if (!image) return;
+    hideHoverButton();
+    openPanelForSource(createImageSource(image)).catch((error) => showToast(error.message || t("contextAnalyzeFailed")));
+  });
+
+  els.more.addEventListener("click", toggleMoreMenu);
+  moreMenu.addEventListener("click", handleMoreMenuClick);
+  moreMenu.addEventListener("keydown", handleMoreMenuKeydown);
   els.close.addEventListener("click", closePanel);
-  els.openOptions.addEventListener("click", async () => {
-    await sendMessage({ type: "open-options" });
+  els.emptyAction.addEventListener("click", handleEmptyAction);
+  panel.addEventListener("keydown", (event) => {
+    // Esc while a Chinese or Japanese input method is composing only cancels
+    // the composition.
+    if (event.key !== "Escape" || event.isComposing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closePanel();
   });
 
   els.input.addEventListener("input", () => {
     state.panelData.prompts[state.panelData.detail][getCurrentLanguage()] = els.input.value;
-    updateMeta();
+    syncCopyButton();
     persistPanelImageCache();
   });
 
-  els.detailShort.addEventListener("click", () => switchDetail("short"));
-  els.detailFull.addEventListener("click", () => switchDetail("full"));
   els.langZh.addEventListener("click", () => setPromptLanguage("zh"));
   els.langEn.addEventListener("click", () => setPromptLanguage("en"));
-  els.tabPrompt.addEventListener("click", () => setStructureOpen(false));
-  els.tabStructure.addEventListener("click", () => setStructureOpen(true));
-  els.analyze.addEventListener("click", () => analyzeCurrentImage({ force: true }));
   els.previewImage.addEventListener("load", syncSourceMeta);
 
-  els.ratios.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-ratio]");
-    if (!button) return;
-    state.panelData.aspectRatio = button.dataset.ratio;
+  els.ratio.addEventListener("change", () => {
+    state.panelData.aspectRatio = els.ratio.value;
     state.panelData.ratioChosen = true;
-    renderRatioButtons();
     persistPanelImageCache();
   });
 
   els.copy.addEventListener("click", async () => {
     const text = getCurrentPrompt().trim();
-    if (!text) {
-      setStatus(t("panelNoPromptToCopy"), "error");
-      return;
-    }
-    await copyText(text, t("panelPromptCopied"));
+    if (text && await copyText(text)) showCopied();
   });
 
-  els.sectionChips.addEventListener("click", async (event) => {
-    const chip = event.target.closest("[data-section]");
-    if (!chip) return;
-    const entry = getStructureEntries().find((item) => item.label === chip.dataset.section);
-    if (!entry) return;
-    await copyText(entry.value, t("panelSectionCopied", { section: getStructureLabel(entry.label) }));
+  els.structure.addEventListener("toggle", () => {
+    state.panelData.structureOpen = els.structure.open;
+    persistPanelImageCache();
   });
+  els.structureList.addEventListener("click", handleStructureClick);
 
   els.generate.addEventListener("click", () => generateFromCurrentPrompt());
   els.inlineGrid.addEventListener("click", handleInlinePreviewClick);
 }
 
-async function copyText(text, successMessage) {
+async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
-    setStatus(successMessage, "success");
+    return true;
   } catch (_error) {
     setStatus(t("panelCopyFailed"), "error");
+    return false;
   }
 }
 
-function renderRatioButtons() {
-  const current = state.panelData.aspectRatio || "1:1";
-  els.ratios.innerHTML = RATIO_OPTIONS.map((ratio) => {
-    const [width, height] = RATIO_SHAPES[ratio];
-    const active = ratio === current;
-    return `
-      <button class="pg-ratio${active ? " is-active" : ""}" data-ratio="${ratio}" type="button" role="radio" aria-checked="${active}">
-        <span class="pg-ratio-shape"><i style="width:${width}px;height:${height}px"></i></span><span>${ratio}</span>
-      </button>
-    `;
-  }).join("");
+function handleViewportChange() {
+  updateHoverButtonPosition();
+  closeMoreMenu();
 }
 
-// One button per filled-in structure section; clicking copies that section in
-// the prompt language shown.
-function renderSectionChips() {
-  const entries = getStructureEntries();
-  els.sectionChips.classList.toggle("pg-hidden", entries.length === 0);
-  els.sectionChips.innerHTML = entries
-    .map(
-      (entry) =>
-        `<button class="pg-section-chip" data-section="${entry.label}" title="${escapeHtml(entry.value)}" type="button">${escapeHtml(getStructureLabel(entry.label))}</button>`
-    )
-    .join("");
+function toggleMoreMenu() {
+  if (!moreMenu.hidden) {
+    closeMoreMenu(true);
+    return;
+  }
+  syncMoreMenu();
+  moreMenu.hidden = false;
+  els.more.setAttribute("aria-expanded", "true");
+  const rect = els.more.getBoundingClientRect();
+  moreMenu.style.left = `${Math.max(8, Math.min(rect.right - moreMenu.offsetWidth, window.innerWidth - moreMenu.offsetWidth - 8))}px`;
+  const top = rect.bottom + 6;
+  moreMenu.style.top = `${top + moreMenu.offsetHeight < window.innerHeight - 8 ? top : Math.max(8, rect.top - moreMenu.offsetHeight - 6)}px`;
+  getMenuItems()[0]?.focus();
+}
+
+function closeMoreMenu(restoreFocus = false) {
+  if (moreMenu.hidden) return;
+  moreMenu.hidden = true;
+  els.more.setAttribute("aria-expanded", "false");
+  if (restoreFocus) els.more.focus();
+}
+
+function getMenuItems() {
+  return [...moreMenu.querySelectorAll("button")].filter((item) => !item.hidden && !item.disabled);
+}
+
+function handleMoreMenuClick(event) {
+  const action = event.target.closest("[data-menu]")?.dataset.menu;
+  if (!action) return;
+  closeMoreMenu(true);
+  if (action === "reanalyze") analyzeCurrentImage({ force: true });
+  else if (action === "full" || action === "short") switchDetail(action);
+  else if (action === "settings") sendMessage({ type: "open-options" }).catch((error) => showToast(error.message));
+}
+
+function handleMoreMenuKeydown(event) {
+  const items = getMenuItems();
+  const index = items.indexOf(document.activeElement);
+  if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+    event.preventDefault();
+    event.stopPropagation();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeMoreMenu(true);
+  } else if (event.key === "Tab") {
+    closeMoreMenu(true);
+  }
+}
+
+function scheduleSettingsRefresh() {
+  clearTimeout(state.settingsRefreshTimer);
+  state.settingsRefreshTimer = setTimeout(() => {
+    refreshSettings().catch(() => {});
+  }, 150);
+}
+
+async function refreshSettings() {
+  state.settings = await sendMessage({ type: "get-settings" });
+  applyStaticTranslations();
+  syncGenerationVisibility();
+  syncPromptControls();
+  renderStructureView();
+  if (state.settings.hoverButtonEnabled === false) hideHoverButton();
+  // Coming back from settings with a connection finishes the setup stage.
+  if (state.panelOpen && panel.dataset.stage === "setup" && state.settings.analysisReady) {
+    beginForSource();
+  }
+}
+
+// Decides the first stage for a source that has no cached result.
+function beginForSource() {
+  if (!state.settings?.analysisReady) {
+    setStage("setup");
+  } else if (state.panelSource?.kind === "region" || !state.settings?.autoAnalyze) {
+    setStage("idle");
+  } else {
+    analyzeCurrentImage({ force: false });
+  }
+}
+
+function renderRatioOptions() {
+  if (!els.ratio.options.length) {
+    els.ratio.innerHTML = RATIO_OPTIONS.map((ratio) => `<option value="${ratio}">${ratio}</option>`).join("");
+  }
+  els.ratio.value = state.panelData.aspectRatio || "1:1";
 }
 
 // Shows "site" under the title, plus "· width × height" once the thumbnail
@@ -448,7 +512,7 @@ function syncSourceMeta(event) {
     // Generate in the source's shape unless the user picked a ratio.
     if (!state.panelData.ratioChosen) {
       state.panelData.aspectRatio = getNearestRatio(naturalWidth, naturalHeight);
-      renderRatioButtons();
+      renderRatioOptions();
     }
   }
   els.imageUrl.textContent = parts.filter(Boolean).join(" · ");
@@ -474,6 +538,7 @@ function getNearestRatio(width, height) {
 }
 
 function getSourceHost(source) {
+  if (source.kind === "region") return location.hostname.replace(/^www\./, "");
   if (!source.imageUrl) return t("panelScreenshotLabel");
   try {
     const url = new URL(source.imageUrl);
@@ -516,8 +581,8 @@ function handleInlinePreviewClick(event) {
 // Pointer moves fire far more often than the screen repaints, so the lookup
 // runs at most once per frame with the latest pointer position.
 function handlePointerMove(event) {
-  if (state.regionSelecting || !toolMenu.hidden) return;
-  if (state.panelOpen && panel.contains(event.target)) return;
+  if (state.regionSelecting || !moreMenu.hidden || state.settings?.hoverButtonEnabled === false) return;
+  if (isOwnUiElement(event.target) && !hoverTrigger.contains(event.target)) return;
 
   state.pointer = { x: event.clientX, y: event.clientY, target: event.target };
   if (!state.hoverFrame) {
@@ -539,13 +604,21 @@ function updateHoverTarget() {
 
   const image =
     (target instanceof Element ? findEligibleImage(target) : null) || findEligibleImageAtPoint(elements);
-  if (!image) {
+  if (!image || isPanelSourceImage(image)) {
     if (!hoverTrigger.matches(":hover")) hideHoverButton();
     return;
   }
 
-  state.hoverImage = image;
-  updateHoverButtonPosition();
+  if (image !== state.hoverImage) {
+    hideHoverButton();
+    state.hoverImage = image;
+    state.hoverTimer = setTimeout(() => {
+      state.hoverTimer = 0;
+      updateHoverButtonPosition();
+    }, HOVER_DELAY);
+    return;
+  }
+  if (!state.hoverTimer) updateHoverButtonPosition();
 }
 
 function findEligibleImage(startNode) {
@@ -573,12 +646,14 @@ function isEligibleImage(image) {
 }
 
 function updateHoverButtonPosition() {
-  if (!state.hoverImage || !document.documentElement.contains(state.hoverImage)) {
+  const image = state.hoverImage;
+  if (state.hoverTimer) return;
+  if (!image || !document.documentElement.contains(image) || isPanelSourceImage(image)) {
     hideHoverButton();
     return;
   }
 
-  const rect = state.hoverImage.getBoundingClientRect();
+  const rect = image.getBoundingClientRect();
   if (rect.width < 96 || rect.height < 96 || rect.bottom < 0 || rect.top > window.innerHeight) {
     hideHoverButton();
     return;
@@ -589,24 +664,26 @@ function updateHoverButtonPosition() {
   hoverTrigger.style.left = `${Math.max(10, rect.left + 8)}px`;
 }
 
-function closeToolMenu(restoreFocus = false) {
-  toolMenu.hidden = true;
-  state.menuSource = null;
-  hoverTrigger.setAttribute("aria-expanded", "false");
-  if (restoreFocus) hoverTrigger.focus();
+// The open panel already shows this image, so its icon is not repeated.
+function isPanelSourceImage(image) {
+  return state.panelOpen && state.panelSource?.element === image;
 }
 
 function hideHoverButton() {
+  clearTimeout(state.hoverTimer);
+  state.hoverTimer = 0;
   state.hoverImage = null;
   hoverTrigger.style.display = "none";
 }
 
 // A source is what the panel analyzes: an <img> element, an image URL found
-// some other way (CSS background, image inside an iframe), or a screenshot of
-// part of the page. `key` identifies it in imageCache.
+// some other way (CSS background, image inside an iframe), a screenshot of
+// part of the page, or a region the user is about to select. `key`
+// identifies it in imageCache.
 function createImageSource(image) {
   const url = image.currentSrc || image.src;
   return {
+    kind: "image",
     key: url,
     element: image,
     cropElement: image,
@@ -621,6 +698,7 @@ function createImageSource(image) {
 
 function createUrlSource(url, cropElement = null) {
   return {
+    kind: "url",
     key: url,
     element: null,
     cropElement,
@@ -635,6 +713,7 @@ function createUrlSource(url, cropElement = null) {
 
 function createCapturedSource(dataUrl, title) {
   return {
+    kind: "capture",
     key: `capture:${Date.now()}`,
     element: null,
     cropElement: null,
@@ -647,19 +726,39 @@ function createCapturedSource(dataUrl, title) {
   };
 }
 
+// Opened before a selection exists, so the panel can ask for a connection
+// first instead of failing after the user has drawn the area.
+function createRegionSource() {
+  return {
+    kind: "region",
+    key: "",
+    element: null,
+    cropElement: null,
+    imageUrl: "",
+    dataUrl: "",
+    previewUrl: "",
+    alt: "",
+    title: t("regionSelectAction"),
+    label: ""
+  };
+}
+
 async function openPanelForSource(source) {
-  closeToolMenu();
+  closeMoreMenu();
+  hideHoverButton();
   state.settings = await sendMessage({ type: "get-settings" });
   applyStaticTranslations();
+  syncGenerationVisibility();
   state.panelSource = source;
-  state.panelOpen = true;
-  panel.classList.add("pg-open");
+  state.panelError = "";
+  showPanel();
 
-  els.previewImage.src = source.previewUrl;
+  setPreviewImage(source.previewUrl);
   els.imageTitle.textContent = source.title || t("panelWebImage");
   syncSourceMeta();
   state.currentJob = null;
   renderInlineImages([]);
+  setStatus("");
 
   const cached = imageCache.get(source.key);
   if (cached) {
@@ -671,21 +770,45 @@ async function openPanelForSource(source) {
   state.panelData.detail = "full";
   state.panelData.language = getDefaultPromptLanguage();
   state.panelData.aspectRatio = state.settings?.aspectRatio || "1:1";
-  renderRatioButtons();
-  renderSectionChips();
-  syncGenerationVisibility();
+  els.structure.open = false;
+  renderRatioOptions();
   syncPromptControls();
   renderStructureView();
-  setStatus(t("panelWaitingAnalyze"));
+  beginForSource();
+}
 
-  if (state.settings?.autoAnalyze) {
-    await analyzeCurrentImage({ force: false });
+function setPreviewImage(url) {
+  els.previewImage.hidden = !url;
+  if (url) els.previewImage.src = url;
+  else els.previewImage.removeAttribute("src");
+}
+
+// Focus moves into the panel so Esc closes it, and returns on close.
+function showPanel() {
+  clearTimeout(state.panelCloseTimer);
+  panel.classList.remove("pg-closing");
+  if (!state.panelOpen) {
+    const active = document.activeElement;
+    state.restoreFocus = active instanceof HTMLElement && active !== document.body && !isOwnUiElement(active) ? active : null;
   }
+  state.panelOpen = true;
+  panel.classList.add("pg-open");
+  panel.focus({ preventScroll: true });
 }
 
 function closePanel() {
+  if (!state.panelOpen) return;
+  closeMoreMenu();
   state.panelOpen = false;
-  panel.classList.remove("pg-open");
+  if (panel.contains(document.activeElement)) {
+    if (state.restoreFocus?.isConnected) state.restoreFocus.focus({ preventScroll: true });
+    else document.activeElement.blur();
+  }
+  state.restoreFocus = null;
+  panel.classList.add("pg-closing");
+  state.panelCloseTimer = setTimeout(() => {
+    panel.classList.remove("pg-open", "pg-closing");
+  }, PANEL_CLOSE_DURATION);
 }
 
 async function analyzeCurrentImage({ force }) {
@@ -697,7 +820,19 @@ async function analyzeCurrentImage({ force }) {
     return;
   }
 
-  await runAction("analyze", t("panelAnalyzing"), async () => {
+  setStatus(t("panelAnalyzing"), "working");
+  setStage("analyzing");
+  // One request at a time; a newer image waits for the current one.
+  if (state.actionState.analyze) {
+    state.queuedSource = targetSource;
+    return;
+  }
+
+  state.actionState.analyze = true;
+  state.queuedSource = null;
+  syncActionState();
+
+  try {
     const imageDataUrl = targetSource.dataUrl || (await captureImageDataUrl(targetSource.element));
     const screenshotCrop = getViewportCrop(targetSource.cropElement);
     const result = await sendMessage({
@@ -732,31 +867,44 @@ async function analyzeCurrentImage({ force }) {
     if (state.panelSource === targetSource) {
       hydratePanelData(cached);
     }
-  });
+  } catch (error) {
+    if (state.panelSource === targetSource) showAnalyzeError(error.message || t("panelActionError"));
+  } finally {
+    state.actionState.analyze = false;
+    syncActionState();
+  }
 
-  // An analysis for a newly opened image is skipped while another one is busy,
-  // so start it once the previous request has finished.
-  const currentSource = state.panelSource;
-  if (
-    state.panelOpen &&
-    currentSource &&
-    currentSource !== targetSource &&
-    !imageCache.has(currentSource.key) &&
-    state.settings?.autoAnalyze
-  ) {
+  const queued = state.queuedSource;
+  state.queuedSource = null;
+  // Not forced: a queued source with the same key, such as the same image
+  // opened again, uses the result just cached instead of a second request.
+  if (queued && queued === state.panelSource && state.panelOpen) {
     await analyzeCurrentImage({ force: false });
   }
+}
+
+// A failed re-analysis keeps the previous result on screen.
+function showAnalyzeError(message) {
+  const cached = imageCache.get(state.panelSource?.key);
+  if (cached) {
+    hydratePanelData(cached);
+    setStatus(message, "error");
+    return;
+  }
+  state.panelError = message;
+  setStatus("");
+  setStage("error");
 }
 
 function switchDetail(detail) {
   state.panelData.detail = detail;
   syncPromptControls();
+  persistPanelImageCache();
 }
 
 function setPromptLanguage(language) {
   state.panelData.language = isPromptLanguageAvailable(language) ? language : "en";
   syncPromptControls();
-  renderSectionChips();
   renderStructureView();
   persistPanelImageCache();
 }
@@ -795,39 +943,27 @@ function hydratePanelData(data) {
   }
 
   els.imageTitle.textContent = state.panelData.title || t("panelPromptTitleFallback");
-  renderRatioButtons();
-  renderSectionChips();
+  els.structure.open = state.panelData.structureOpen;
+  renderRatioOptions();
   syncGenerationVisibility();
   syncPromptControls();
   renderStructureView();
-  setStatus(t("panelAnalyzeDone"), "success");
+  setStatus("");
+  setStage("ready");
 }
 
 function syncPromptControls() {
-  const structureOpen = state.panelData.structureOpen;
-  setPressed(els.tabPrompt, !structureOpen, "aria-selected");
-  setPressed(els.tabStructure, structureOpen, "aria-selected");
-  setPressed(els.detailShort, state.panelData.detail === "short");
-  setPressed(els.detailFull, state.panelData.detail === "full");
   els.langSeg.classList.toggle("pg-hidden", !isPromptLanguageAvailable("zh"));
   setPressed(els.langZh, getCurrentLanguage() === "zh");
   setPressed(els.langEn, getCurrentLanguage() === "en");
-  els.input.classList.toggle("pg-hidden", structureOpen);
-  els.charCount.classList.toggle("pg-hidden", structureOpen);
   els.input.value = getCurrentPrompt();
-  updateMeta();
+  syncCopyButton();
+  syncMoreMenu();
 }
 
 function setPressed(button, active, attribute = "aria-pressed") {
   button.classList.toggle("is-active", active);
   button.setAttribute(attribute, String(active));
-}
-
-function setStructureOpen(open) {
-  state.panelData.structureOpen = open;
-  syncPromptControls();
-  renderStructureView();
-  persistPanelImageCache();
 }
 
 function getCurrentPrompt() {
@@ -859,32 +995,36 @@ function normalizePromptPair(value) {
   };
 }
 
+// One row per filled-in section; clicking a row copies that section in the
+// prompt language shown.
 function renderStructureView() {
   const entries = getStructureEntries();
-  const visible = state.panelData.structureOpen;
-  els.structure.classList.toggle("pg-hidden", !visible);
-  els.structureGrid.dataset.uiLanguage = getTranslator().language;
-
-  if (!visible) {
-    els.structureGrid.innerHTML = "";
-    return;
-  }
-
-  if (entries.length === 0) {
-    els.structureGrid.innerHTML = `<p class="pg-structure-empty">${escapeHtml(t("panelStructureEmpty"))}</p>`;
-    return;
-  }
-
-  els.structureGrid.innerHTML = entries
+  els.structure.classList.toggle("pg-hidden", entries.length === 0);
+  els.structureList.dataset.uiLanguage = getTranslator().language;
+  els.structureList.innerHTML = entries
     .map(
       (entry) => `
-        <div class="pg-structure-row">
+        <button class="pg-structure-row" data-section="${entry.label}" type="button">
           <span class="pg-structure-label">${escapeHtml(getStructureLabel(entry.label))}</span>
-          <p class="pg-structure-value">${escapeHtml(entry.value)}</p>
-        </div>
+          <span class="pg-structure-value">${escapeHtml(entry.value)}</span>
+          <span class="pg-row-icon">${ICONS.copy}</span>
+        </button>
       `
     )
     .join("");
+}
+
+async function handleStructureClick(event) {
+  const row = event.target.closest("[data-section]");
+  if (!row) return;
+  const entry = getStructureEntries().find((item) => item.label === row.dataset.section);
+  if (!entry || !(await copyText(entry.value))) return;
+  row.classList.add("is-copied");
+  row.querySelector(".pg-row-icon").innerHTML = ICONS.check;
+  setTimeout(() => {
+    row.classList.remove("is-copied");
+    row.querySelector(".pg-row-icon").innerHTML = ICONS.copy;
+  }, COPIED_FEEDBACK_DURATION);
 }
 
 function getStructureEntries() {
@@ -933,7 +1073,8 @@ async function generateFromCurrentPrompt() {
     return;
   }
 
-  await runAction("generate", t("panelGenerating"), async () => {
+  setStatus("");
+  await runAction("generate", async () => {
     const result = await sendMessage({
       type: "generate-image",
       payload: {
@@ -948,25 +1089,19 @@ async function generateFromCurrentPrompt() {
       images: result.images || []
     };
 
+    // The images appearing under the button are the confirmation.
     renderInlineImages(state.currentJob.images);
-    setStatus(t("panelGenerated"), "success");
   });
 }
 
+// Only analyzed results are cached; setup and idle panels have nothing to keep.
 function persistPanelImageCache() {
-  if (!state.panelSource?.key) return;
+  if (!state.panelSource?.key || panel.dataset.stage !== "ready") return;
   imageCache.set(state.panelSource.key, structuredClone(state.panelData));
 }
 
 function renderInlineImages(images) {
-  if (!images || images.length === 0) {
-    els.inlinePreview.classList.remove("is-visible");
-    els.inlineGrid.innerHTML = "";
-    return;
-  }
-
-  els.inlinePreview.classList.add("is-visible");
-  els.inlineGrid.innerHTML = images
+  els.inlineGrid.innerHTML = (images || [])
     .map((image, index) => {
       const src = `data:${image.mimeType || "image/png"};base64,${image.base64Data}`;
       return `
@@ -999,17 +1134,11 @@ function triggerDownload(src, filename) {
   link.remove();
 }
 
-function updateMeta() {
-  const text = els.input.value || "";
-  els.charCount.textContent = t("panelChars", { count: text.length });
-}
-
-async function runAction(actionName, statusText, task) {
+async function runAction(actionName, task) {
   if (state.actionState[actionName]) return;
 
   state.actionState[actionName] = true;
   syncActionState();
-  setStatus(statusText, "working");
 
   try {
     await task();
@@ -1018,13 +1147,15 @@ async function runAction(actionName, statusText, task) {
   } finally {
     state.actionState[actionName] = false;
     syncActionState();
-    updateMeta();
   }
 }
 
 function syncActionState() {
-  els.analyze.classList.toggle("is-busy", state.actionState.analyze);
-  els.generate.classList.toggle("is-busy", state.actionState.generate);
+  const generating = state.actionState.generate;
+  els.generate.classList.toggle("is-busy", generating);
+  els.generate.disabled = generating;
+  els.generateLabel.textContent = t(generating ? "panelGenerating" : "panelGenerate");
+  syncMoreMenu();
 }
 
 function syncGenerationVisibility() {
@@ -1140,7 +1271,7 @@ async function handleContextAnalyze({ srcUrl, inSubframe }) {
   }
 
   showToast(t("contextNoImageFound"));
-  startRegionSelection();
+  await startRegionSelection();
 }
 
 // elementsFromPoint also returns elements underneath transparent overlays,
@@ -1205,30 +1336,44 @@ function getBackgroundImageUrl(element) {
 function isOwnUiElement(element) {
   return (
     hoverTrigger.contains(element) ||
-    toolMenu.contains(element) ||
+    moreMenu.contains(element) ||
     element === toast ||
     panel.contains(element) ||
     Boolean(element.closest?.("#pg-region-overlay"))
   );
 }
 
-function startRegionSelection() {
-  closeToolMenu();
+async function startRegionSelection() {
+  closeMoreMenu();
   if (state.regionSelecting) return;
   state.regionSelecting = true;
   hideHoverButton();
+  try {
+    state.settings = await sendMessage({ type: "get-settings" });
+  } catch (error) {
+    state.regionSelecting = false;
+    throw error;
+  }
+  // Ask for a connection before the user draws an area that cannot be analyzed.
+  if (!state.settings.analysisReady) {
+    state.regionSelecting = false;
+    await openPanelForSource(createRegionSource());
+    return;
+  }
+
   // Hide the panel while selecting so the page looks exactly like the
   // screenshot will, instead of the panel covering part of it.
-  const restoreUi = hideOwnUiForCapture([panel, hoverTrigger, toolMenu]);
+  const restoreUi = hideOwnUiForCapture([panel, hoverTrigger, moreMenu]);
 
   const overlay = document.createElement("div");
   overlay.id = "pg-region-overlay";
   overlay.lang = getTranslator().messages.htmlLang;
   overlay.innerHTML = `
     <div class="pg-region-hint">${escapeHtml(t("regionSelectHint"))}</div>
-    <div class="pg-region-box"></div>
+    <div class="pg-region-box"><span class="pg-region-size"></span></div>
   `;
   const box = overlay.querySelector(".pg-region-box");
+  const sizeLabel = overlay.querySelector(".pg-region-size");
   let start = null;
   let selection = null;
 
@@ -1244,6 +1389,10 @@ function startRegionSelection() {
     box.style.width = `${selection.width}px`;
     box.style.height = `${selection.height}px`;
     box.classList.add("is-visible");
+    // The size label sits above the box, or inside it near the top edge.
+    box.classList.toggle("is-label-inside", selection.y < 28);
+    const scale = window.devicePixelRatio || 1;
+    sizeLabel.textContent = `${Math.round(selection.width * scale)} × ${Math.round(selection.height * scale)}`;
   };
 
   const onKeyDown = (event) => {
@@ -1278,6 +1427,8 @@ function startRegionSelection() {
     event.preventDefault();
     start = { x: event.clientX, y: event.clientY };
     overlay.setPointerCapture(event.pointerId);
+    // Once dragging starts, the box's shadow dims the page outside it.
+    overlay.classList.add("is-dragging");
     updateSelection(event);
   });
   overlay.addEventListener("pointermove", (event) => {
@@ -1317,7 +1468,7 @@ async function captureViewportRegion(crop) {
   }
 }
 
-function hideOwnUiForCapture(elements = [panel, hoverTrigger, toolMenu, toast]) {
+function hideOwnUiForCapture(elements = [panel, hoverTrigger, moreMenu, toast]) {
   const previous = elements.map((element) => element.style.visibility);
   elements.forEach((element) => {
     element.style.visibility = "hidden";

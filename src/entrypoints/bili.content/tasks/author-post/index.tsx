@@ -50,7 +50,7 @@ const Component = (props: TaskDialogProps & ExtendedProps) => {
     return (<Dialog {...restProps}>
         <DialogContent className="max-w-[600px]" aria-describedby={undefined}>
             <DialogHeader>
-                <DialogTitle>{author ? <>导出<span className="text-red-400">{author.authorName}</span>的视频数据</> : <>根据UP主链接批量导出视频数据</>}</DialogTitle>
+                <DialogTitle>{author ? <>导出「{author.authorName}」的视频数据</> : <>根据UP主链接批量导出视频数据</>}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
                 <form className="space-y-6 py-4">
@@ -65,7 +65,7 @@ const Component = (props: TaskDialogProps & ExtendedProps) => {
                 </form>
             </Form>
             <DialogFooter>
-                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">开始</Button>
+                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">导出</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>);

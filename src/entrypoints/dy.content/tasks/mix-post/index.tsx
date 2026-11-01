@@ -51,8 +51,8 @@ const Component = (props: TaskDialogProps & ExtendedProps) => {
     return (<Dialog {...restProps}>
         <DialogContent className="max-w-[600px]" aria-describedby={undefined}>
             <DialogHeader>
-                <DialogTitle>导出合集<span className="text-red-400">{mixInfo?.mix_name}</span>的视频数据</DialogTitle>
-                <DialogDescription>当前合集共有<span className="text-red-400">{mixInfo?.statis?.updated_to_episode ?? '?'}</span>个视频</DialogDescription>
+                <DialogTitle>导出合集「{mixInfo?.mix_name}」的视频数据</DialogTitle>
+                <DialogDescription>当前合集共有 {mixInfo?.statis?.updated_to_episode ?? '?'} 个视频</DialogDescription>
             </DialogHeader>
             <Form {...form}>
                 <form className="space-y-6 py-4">
@@ -60,7 +60,7 @@ const Component = (props: TaskDialogProps & ExtendedProps) => {
                 </form>
             </Form>
             <DialogFooter>
-                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">开始</Button>
+                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">导出</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>);

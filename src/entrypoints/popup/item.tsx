@@ -1,48 +1,33 @@
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, LucideIcon } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 
 export interface ItemProp extends React.HTMLAttributes<HTMLDivElement> {
   icon: LucideIcon | string;
   iconClassName?: string;
   title: string;
   label?: React.ReactNode;
+  disabled?: boolean;
 }
 
+// One popup row: icon, title and an optional trailing label such as a shortcut.
 export const Item = (props: ItemProp) => {
-  const { icon: Icon, title, label, className, iconClassName, ...restProps } = props;
+  const { icon: Icon, title, label, className, iconClassName, disabled, onClick, ...restProps } = props;
 
   return (<div
-    className={cn("popup-item h-9 w-full px-4 inline-flex items-center whitespace-nowrap text-[13px] font-medium justify-start hover:cursor-pointer", className)}
+    className={cn("popup-item flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] aria-disabled:cursor-default aria-disabled:opacity-50", className)}
     role="button"
-    tabIndex={0}
+    tabIndex={disabled ? -1 : 0}
+    aria-disabled={disabled || undefined}
+    onClick={disabled ? undefined : onClick}
     onKeyDown={(event) => {
+      if (disabled) return;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        restProps.onClick?.(event as unknown as React.MouseEvent<HTMLDivElement>);
+        onClick?.(event as unknown as React.MouseEvent<HTMLDivElement>);
       }
     }}
     {...restProps}>
-    {typeof Icon === "string" ? <img src={Icon} className={cn("mr-3 h-4 w-4 rounded-[5px]", iconClassName)} alt="" /> : <Icon className={cn("mr-3 h-4 w-4", iconClassName)} />}
-    <span className="overflow-ellipsis overflow-hidden flex-1">{title}</span>
-    {label}
+    {typeof Icon === "string" ? <img src={Icon} className={cn("size-4 shrink-0 rounded-[4px]", iconClassName)} alt="" /> : <Icon className={cn("size-4 shrink-0 text-muted-foreground", iconClassName)} />}
+    <span className="min-w-0 flex-1 truncate">{title}</span>
+    {label && <span className="shrink-0 text-xs text-muted-foreground">{label}</span>}
   </div>);
-};
-
-export interface CollapsibleItemProp extends ItemProp {
-  items?: ItemProp[];
-  defaultExpand?: boolean;
-}
-
-export const CollapsibleItem = (props: CollapsibleItemProp) => {
-  const { label, defaultExpand, children, items, ...restProps } = props;
-  const [isOpen, setIsOpen] = useState(defaultExpand ?? false);
-
-  return (<Collapsible open={isOpen} onOpenChange={setIsOpen}>
-    <CollapsibleTrigger asChild>
-      <Item {...restProps} label={label ?? (isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)} />
-    </CollapsibleTrigger>
-    <CollapsibleContent className="popup-subitem flex flex-col gap-1 pl-4 py-1">
-      {items ? items.map((item, index) => <Item key={`${item.title}-${index}`} {...item} />) : children}
-    </CollapsibleContent>
-  </Collapsible>);
 };

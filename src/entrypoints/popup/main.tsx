@@ -5,107 +5,113 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import biliIcon from "@/assets/icons/bili.svg";
 import dyIcon from "@/assets/icons/dy.png";
 import xhsIcon from "@/assets/icons/xhs.png";
 import ksIcon from "@/assets/icons/ks.png";
 import { OpenseekMark } from "@/components/logo";
-import { Separator } from "@/components/ui/separator";
-import { Book, BookText, BookUser, Bug, CircleUser, ExternalLink, GitBranch, MessageSquareMore, MonitorCheck, TvMinimal, ScanLine, Settings, Sparkles } from "lucide-react";
+import { BookText, BookUser, CircleUser, ExternalLink, MessageSquareMore, ScanLine, Settings } from "lucide-react";
 import ReactDOM from "react-dom/client";
 import { Tabs } from "wxt/browser";
-import { CollapsibleItem, CollapsibleItemProp, Item } from './item';
+import { Item, ItemProp } from './item';
 
 type Platform = {
     code: string;
     hostname: string;
     label: string;
-    description: string;
-    icon: CollapsibleItemProp["icon"];
+    icon: string;
     hostnames?: string[];
-    getItems: (handleOpenDialog: (name: string) => void) => CollapsibleItemProp[];
+    getItems: (handleOpenDialog: (name: string) => void) => ItemProp[];
 };
 
+// Each platform lists its batch exports as flat rows; the dialogs ask for links.
 const platforms: Platform[] = [
     {
         code: 'bili',
         hostname: 'www.bilibili.com',
         hostnames: ['www.bilibili.com', 'space.bilibili.com', 'm.bilibili.com'],
         label: '哔哩哔哩',
-        description: '视频与UP主数据',
-        icon: TvMinimal,
+        icon: biliIcon,
         getItems: (handleOpenDialog) => [
-            { icon: CircleUser, title: '批量导出UP主信息', onClick: () => handleOpenDialog('author') },
-            { icon: Book, title: '批量导出视频数据', defaultExpand: true, items: [
-                { icon: BookText, title: '根据视频链接导出', onClick: () => handleOpenDialog('post') },
-                { icon: BookUser, title: '根据UP主链接导出', onClick: () => handleOpenDialog('author-post') },
-            ] },
-            { icon: MessageSquareMore, title: '批量导出视频评论', onClick: () => handleOpenDialog('post-comment') },
+            { icon: CircleUser, title: 'UP主信息', onClick: () => handleOpenDialog('author') },
+            { icon: BookText, title: '视频数据', onClick: () => handleOpenDialog('post') },
+            { icon: BookUser, title: 'UP主投稿', onClick: () => handleOpenDialog('author-post') },
+            { icon: MessageSquareMore, title: '视频评论', onClick: () => handleOpenDialog('post-comment') },
         ]
     },
     {
         code: 'dy',
         hostname: 'www.douyin.com',
         label: '抖音',
-        description: '短视频与达人数据',
         icon: dyIcon,
-        getItems: (handleOpenDialog) => {
-            return [
-                { icon: CircleUser, title: '批量导出达人信息', onClick: () => { handleOpenDialog('author') } },
-                {
-                    icon: Book, title: '批量导出视频数据', defaultExpand: true, items: [
-                        { icon: BookText, title: '根据视频链接导出', onClick: () => { handleOpenDialog('post') } },
-                        { icon: BookUser, title: '根据达人链接导出', onClick: () => { handleOpenDialog('author-post') } },
-                    ]
-                },
-                { icon: MessageSquareMore, title: '批量导出视频评论', onClick: () => { handleOpenDialog('post-comment') } },
-            ];
-        }
+        getItems: (handleOpenDialog) => [
+            { icon: CircleUser, title: '达人信息', onClick: () => handleOpenDialog('author') },
+            { icon: BookText, title: '视频数据', onClick: () => handleOpenDialog('post') },
+            { icon: BookUser, title: '达人作品', onClick: () => handleOpenDialog('author-post') },
+            { icon: MessageSquareMore, title: '视频评论', onClick: () => handleOpenDialog('post-comment') },
+        ]
     },
     {
         code: 'xhs',
         hostname: 'www.xiaohongshu.com',
         label: '小红书',
-        description: '笔记与博主数据',
         icon: xhsIcon,
-        getItems: (handleOpenDialog) => {
-            return [
-                { icon: CircleUser, title: '批量导出博主信息', onClick: () => { handleOpenDialog('author') } },
-                {
-                    icon: Book, title: '批量导出笔记数据', defaultExpand: true, items: [
-                        { icon: BookText, title: '根据笔记链接导出', onClick: () => { handleOpenDialog('post') } },
-                        { icon: BookUser, title: '根据博主链接导出', onClick: () => { handleOpenDialog('author-post') } },
-                    ]
-                },
-                { icon: MessageSquareMore, title: '批量导出笔记评论', onClick: () => { handleOpenDialog('post-comment') } },
-            ];
-        }
+        getItems: (handleOpenDialog) => [
+            { icon: CircleUser, title: '博主信息', onClick: () => handleOpenDialog('author') },
+            { icon: BookText, title: '笔记数据', onClick: () => handleOpenDialog('post') },
+            { icon: BookUser, title: '博主笔记', onClick: () => handleOpenDialog('author-post') },
+            { icon: MessageSquareMore, title: '笔记评论', onClick: () => handleOpenDialog('post-comment') },
+        ]
     },
     {
         code: 'ks',
         hostname: 'www.kuaishou.com',
         label: '快手',
-        description: '视频与达人数据',
         icon: ksIcon,
-        getItems: (handleOpenDialog) => {
-            return [
-                { icon: CircleUser, title: '批量导出达人信息', onClick: () => { handleOpenDialog('author') } },
-                {
-                    icon: Book, title: '批量导出视频数据', defaultExpand: true, items: [
-                        { icon: BookText, title: '根据视频链接导出', onClick: () => { handleOpenDialog('post') } },
-                        { icon: BookUser, title: '根据达人链接导出', onClick: () => { handleOpenDialog('author-post') } },
-                    ]
-                },
-                { icon: MessageSquareMore, title: '批量导出视频评论', onClick: () => { handleOpenDialog('post-comment') } },
-            ];
-        }
+        getItems: (handleOpenDialog) => [
+            { icon: CircleUser, title: '达人信息', onClick: () => handleOpenDialog('author') },
+            { icon: BookText, title: '视频数据', onClick: () => handleOpenDialog('post') },
+            { icon: BookUser, title: '达人作品', onClick: () => handleOpenDialog('author-post') },
+            { icon: MessageSquareMore, title: '视频评论', onClick: () => handleOpenDialog('post-comment') },
+        ]
     }
 ];
 
+const isMac = /Mac/i.test(navigator.platform);
+
+// Shows the shortcut the user actually has, in the symbols of their platform.
+function formatShortcut(shortcut: string) {
+    if (!isMac) return shortcut;
+    const symbols: Record<string, string> = { Ctrl: '⌃', MacCtrl: '⌃', Alt: '⌥', Option: '⌥', Shift: '⇧', Command: '⌘' };
+    return shortcut.split('+').map(key => symbols[key] ?? key).join('');
+}
+
+function useRegionShortcut() {
+    const [shortcut, setShortcut] = useState('');
+    useEffect(() => {
+        browser.commands.getAll()
+            .then(commands => setShortcut(formatShortcut(commands.find(command => command.name === 'select-region')?.shortcut || '')))
+            .catch(() => setShortcut(''));
+    }, []);
+    return shortcut;
+}
+
+const Section = (props: { title: string; icon?: string; children: React.ReactNode }) => (
+    <section className="border-t px-2 py-2">
+        <div className="flex h-7 items-center gap-1.5 px-2.5 text-xs text-muted-foreground">
+            {props.icon && <img src={props.icon} className="size-3.5 rounded-[3px]" alt="" />}
+            {props.title}
+        </div>
+        <div className="flex flex-col">{props.children}</div>
+    </section>
+);
 
 const App = () => {
     const [tab, setTab] = useState<Tabs.Tab>();
     const [platform, setPlatform] = useState<Platform>();
     const [imageError, setImageError] = useState('');
+    const [exportError, setExportError] = useState('');
+    const shortcut = useRegionShortcut();
 
     useEffect(() => {
         browser.tabs.query({ active: true, currentWindow: true })
@@ -122,11 +128,17 @@ const App = () => {
             });
     }, []);
 
-    const handleOpenDialog = (name: string) => {
-        sendMessage('openTaskDialog', { name }, tab?.id);
+    // Like 区域框选: close once the dialog is open on the page. A page loaded
+    // before the extension cannot receive the message until it is refreshed.
+    const handleOpenDialog = async (name: string) => {
+        try {
+            await sendMessage('openTaskDialog', { name }, tab?.id);
+            window.close();
+        } catch {
+            setExportError('请刷新当前网页后重试。');
+        }
     }
 
-    const availableItems = platform?.getItems(handleOpenDialog) ?? [];
     const canAnalyzePage = /^https?:\/\//.test(tab?.url ?? '');
 
     const handleSelectRegion = async () => {
@@ -135,67 +147,41 @@ const App = () => {
             await browser.tabs.sendMessage(tab.id, { type: 'start-region-selection' }, { frameId: 0 });
             window.close();
         } catch {
-            setImageError('请刷新当前网页后重试，或在网页图片上右键分析。');
+            setImageError('请刷新当前网页后重试。');
         }
     };
 
     return (<main className="popup-shell">
-        <header className="popup-header px-5 py-4">
-            <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-white/95 shadow-[0_8px_18px_rgba(0,0,0,0.24)]">
-                    <OpenseekMark className="size-8" />
-                </div>
-                <div className="min-w-0">
-                    <p className="text-[10px] font-semibold tracking-[0.12em] text-[#b99ff6]">千寻助手</p>
-                    <h1 className="truncate text-[17px] font-semibold tracking-[0.08em] text-white">OPENSEEK</h1>
-                </div>
-                <button type="button" aria-label="图片反推设置" title="图片反推设置" onClick={() => browser.runtime.openOptionsPage()} className="ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-[#aaa1b6] transition hover:bg-[#261e32] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b99ff6]">
-                    <Settings className="size-[18px]" aria-hidden="true" />
-                </button>
+        <header className="flex items-center gap-3 px-4 py-3.5">
+            <OpenseekMark className="size-9" />
+            <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground">千寻助手</p>
+                <h1 className="truncate text-[15px] font-semibold tracking-[0.06em]">OPENSEEK</h1>
             </div>
+            <button type="button" aria-label="设置" title="设置" onClick={() => browser.runtime.openOptionsPage()} className="ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                <Settings className="size-[18px]" aria-hidden="true" />
+            </button>
         </header>
 
-        <section className="border-b border-[#2b2535] px-5 py-4" aria-label="图片反推">
-            <div className="mb-2 flex items-center justify-between">
-                <p className="flex items-center gap-2 text-[13px] font-semibold text-white"><Sparkles className="size-4 text-[#b99ff6]" />图透镜</p>
-            </div>
-            <button type="button" disabled={!canAnalyzePage} onClick={handleSelectRegion} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3 bg-[#612bd3] text-xs font-medium text-white transition hover:bg-[#713be3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b99ff6] disabled:cursor-not-allowed disabled:opacity-40">
-                <ScanLine className="size-4" />区域框选<span className="ml-auto rounded bg-black/15 px-1.5 py-1 text-[10px] text-white/70">Alt ⇧ S</span>
-            </button>
-            {imageError && <p role="alert" className="mt-2 text-[10px] leading-5 text-[#f6a2ae]">{imageError}</p>}
-        </section>
+        <Section title="图透镜">
+            <Item icon={ScanLine} title="区域框选" disabled={!canAnalyzePage} label={canAnalyzePage ? shortcut : '此页面不可用'} onClick={handleSelectRegion} />
+            {imageError && <p role="alert" className="px-2.5 pb-1 pt-1.5 text-xs text-destructive">{imageError}</p>}
+        </Section>
 
-        <section className="px-2 py-3">
-            {platform ? <>
-                <div className="mb-2 flex items-center justify-between px-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8d8497]">可用工具</p>
-                    <span className="text-[10px] text-[#6f6879]">{platform.description}</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                    {availableItems.map((item, index) => item.items ? <CollapsibleItem key={`${item.title}-${index}`} {...item} /> : <Item key={`${item.title}-${index}`} {...item} />)}
-                </div>
-            </> : <>
-                <div className="mb-2 flex items-center gap-2 px-3">
-                    <MonitorCheck className="size-4 text-[#b99ff6]" />
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8d8497]">社媒数据</p>
-                </div>
-                <div className="flex flex-col gap-1">
-                    {platforms.map((supportedPlatform) => <Item
-                        key={supportedPlatform.code}
-                        icon={supportedPlatform.icon}
-                        title={supportedPlatform.label}
-                        label={<ExternalLink className="size-3.5 text-[#6f6879]" />}
-                        onClick={() => window.open(`https://${supportedPlatform.hostname}`, "_blank")}
-                    />)}
-                </div>
-            </>}
-        </section>
-
-        <Separator className="bg-[#2b2535]" />
-        <footer className="flex items-center justify-between gap-1 px-3 py-2">
-            <Item className="h-8 flex-1 rounded-md px-2 text-[11px] text-[#91899d]" icon={GitBranch} title="查看源码" iconClassName="size-3.5 text-[#b99ff6]" onClick={() => window.open('https://github.com/LIBERSEEK/OpenSeek-EXTENSIONS', "_blank")} />
-            <Item className="h-8 flex-1 rounded-md px-2 text-[11px] text-[#91899d]" icon={Bug} title="提交反馈" iconClassName="size-3.5 text-[#e98bb5]" onClick={() => window.open('https://github.com/LIBERSEEK/OpenSeek-EXTENSIONS/issues', "_blank")} />
-        </footer>
+        {platform
+            ? <Section title={`${platform.label} · 批量导出`} icon={platform.icon}>
+                {platform.getItems(handleOpenDialog).map(item => <Item key={item.title} {...item} />)}
+                {exportError && <p role="alert" className="px-2.5 pb-1 pt-1.5 text-xs text-destructive">{exportError}</p>}
+            </Section>
+            : <Section title="社媒数据">
+                {platforms.map((supportedPlatform) => <Item
+                    key={supportedPlatform.code}
+                    icon={supportedPlatform.icon}
+                    title={supportedPlatform.label}
+                    label={<ExternalLink className="size-3.5" />}
+                    onClick={() => window.open(`https://${supportedPlatform.hostname}`, "_blank")}
+                />)}
+            </Section>}
     </main>);
 };
 

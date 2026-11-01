@@ -20,8 +20,11 @@ export { parseUrl, Processor };
 
 export type FormSchema = z.infer<typeof formSchema>;
 
-const Component = (props: TaskDialogProps & { urls?: string[] }) => {
-    const { urls, setProcessor, ...restProps } = props;
+const Component = (props: TaskDialogProps & { urls?: string[]; autoStart?: boolean }) => {
+    const { urls, autoStart, setProcessor, ...restProps } = props;
+    // Opened for the video on the page: start right away, and show the form
+    // only if that link cannot be used.
+    const [showForm, setShowForm] = useState(!autoStart);
 
     const form = useForm<any, any, FormSchema>({
         resolver: zodResolver(formSchema),
@@ -34,6 +37,12 @@ const Component = (props: TaskDialogProps & { urls?: string[] }) => {
     const handleSubmit = (values: FormSchema) => {
         setProcessor(new Processor(values));
     }
+
+    useEffect(() => {
+        if (autoStart) void form.handleSubmit(handleSubmit, () => setShowForm(true))();
+    }, []);
+
+    if (!showForm) return null;
 
     return (<Dialog {...restProps}>
         <DialogContent className="max-w-[600px]" aria-describedby={undefined}>
@@ -49,7 +58,7 @@ const Component = (props: TaskDialogProps & { urls?: string[] }) => {
                 </form>
             </Form>
             <DialogFooter>
-                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">开始</Button>
+                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">导出</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>);

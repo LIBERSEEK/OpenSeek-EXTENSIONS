@@ -17,7 +17,6 @@ export default defineBackground(() => {
         }
     });
 
-    onMessage('openImageSettings', () => browser.runtime.openOptionsPage());
     onMessage('openPopup', () => {
         return browser.action.openPopup();
     });

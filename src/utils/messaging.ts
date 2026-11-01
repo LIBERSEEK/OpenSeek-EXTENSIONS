@@ -7,7 +7,6 @@ export interface ProtocolMap {
     mnsv2(args: any): string;
     openPopup(): void;
     selectImageRegion(): void;
-    openImageSettings(): void;
     openTaskDialog(data: { name: string } & Record<string, any>): void;
     download(options: TaskDownloadOption): number;
 }

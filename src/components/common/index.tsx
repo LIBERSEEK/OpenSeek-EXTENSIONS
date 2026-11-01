@@ -44,7 +44,8 @@ const App = (props: {
     const TaskDialog = taskDialogName && props.tasks?.find(t => t.name === taskDialogName)?.children;
 
     return (<>
-        <Toaster position="top-center" theme="light" richColors expand />
+        {/* Neutral toasts that follow the system theme, like the rest of the UI. */}
+        <Toaster position="top-center" expand />
         {TaskDialog && <TaskDialog modal={true} open={true} onOpenChange={() => setTaskDialogName(undefined)} setProcessor={setProcessor} {...taskDialogProps} />}
         {taskProcessor && <TaskProgress processor={taskProcessor} onClose={() => setTaskProcessor(undefined)} />}
     </>

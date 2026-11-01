@@ -47,7 +47,7 @@ const Component = (props: TaskDialogProps & ExtendedProps) => {
     return (<Dialog {...restProps}>
         <DialogContent className="max-w-[600px]" aria-describedby={undefined}>
             <DialogHeader>
-                <DialogTitle>{post ? <>导出笔记<span className="text-red-400">{post.title}</span>的评论数据</> : <>根据笔记链接批量导出笔记评论</>}</DialogTitle>
+                <DialogTitle>{post ? <>导出笔记「{post.title}」的评论数据</> : <>根据笔记链接批量导出笔记评论</>}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
                 <form className="space-y-6 py-4">
@@ -64,7 +64,7 @@ const Component = (props: TaskDialogProps & ExtendedProps) => {
                 </form>
             </Form>
             <DialogFooter>
-                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">开始</Button>
+                <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">导出</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>);

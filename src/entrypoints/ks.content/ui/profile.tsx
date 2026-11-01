@@ -57,7 +57,7 @@ const Component = ({ userId }: Props) => {
 
     return (<ToolMenu>
         <CopyButton submenu options={copyOptions} getData={getUserInfo}>复制达人信息</CopyButton>
-        <DropdownMenuItem onSelect={throttle(handlerOpenExportDialog, 2000)}>导出视频数据</DropdownMenuItem>
+        <DropdownMenuItem onSelect={throttle(handlerOpenExportDialog, 2000)}>导出达人作品</DropdownMenuItem>
     </ToolMenu>);
 };
 

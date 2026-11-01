@@ -9,7 +9,7 @@ Social Media Copilot - Open Source Edition (the "Extension") is an open-source C
 
 This Privacy Policy explains what data the Extension handles, why it is handled, where it goes, and the controls available to users. The source code of the Extension is publicly available at <https://github.com/LIBERSEEK/OpenSeek-EXTENSIONS>.
 
-The local OPENSEEK integration also includes ImageLens image-to-prompt features on ordinary HTTP/HTTPS pages. Existing social collection purposes remain unchanged; the following supplement describes image analysis.
+The local OPENSEEK integration also includes Image Lens, the image-to-prompt feature integrated from ImageLens, on ordinary HTTP/HTTPS pages. Existing social collection purposes remain unchanged; the following supplement describes image analysis.
 
 ### Image Analysis Supplement
 

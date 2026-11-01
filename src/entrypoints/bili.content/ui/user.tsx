@@ -26,12 +26,12 @@ const Component = () => {
     const run = (action: () => Promise<unknown>) => { void action().catch(error => toast.error(error.message || '操作失败，请刷新B站页面后重试')); };
 
     return <ToolMenu>
+        <CopyButton submenu getData={getAuthor} options={[{ label: 'UP主UID', value: 'card.mid' }, { label: 'UP主昵称', value: 'card.name' }, { label: '个人简介', value: 'card.sign' }, { label: '粉丝数', value: 'card.fans' }]}>复制UP主信息</CopyButton>
         <DropdownMenuItem onSelect={() => run(() => sendMessage('openTaskDialog', { name: 'author', urls: [url] }))}>导出UP主信息</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => run(async () => {
             const info = await getAuthor();
             await sendMessage('openTaskDialog', { name: 'author-post', author: { authorId: id, authorName: info.card.name, postCount: info.archive_count, url } });
         })}>导出UP主投稿</DropdownMenuItem>
-        <CopyButton submenu getData={getAuthor} options={[{ label: 'UP主UID', value: 'card.mid' }, { label: 'UP主昵称', value: 'card.name' }, { label: '个人简介', value: 'card.sign' }, { label: '粉丝数', value: 'card.fans' }]}>复制UP主信息</CopyButton>
     </ToolMenu>;
 };
 
