@@ -1,5 +1,5 @@
 import { Button, ButtonProps } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import copy from "copy-to-clipboard";
 import { throttle } from "lodash";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -15,8 +15,9 @@ export type CopyOption = {
 export function CopyButton(props: ButtonProps & {
   options: CopyOption[];
   getData?: () => Promise<Record<string, any>>;
+  submenu?: boolean;
 }) {
-  const { options, getData,children, ...restProps } = props;
+  const { options, getData, children, submenu, ...restProps } = props;
   const [openDropdown, setOpenDropdown] = useState(false);
 
   const getDataValue = (key: string, data: Record<string, any>) => {
@@ -59,6 +60,21 @@ export function CopyButton(props: ButtonProps & {
     } else {
       toast.error("复制失败");
     }
+  }
+
+  if (submenu) {
+    return <DropdownMenuSub>
+      <DropdownMenuSubTrigger>{children}</DropdownMenuSubTrigger>
+      <DropdownMenuPortal container={document.shadow.body}>
+        <DropdownMenuSubContent collisionPadding={12} className="min-w-[180px]">
+          <DropdownMenuItem onSelect={() => { void copyAll().catch(() => toast.error('获取复制内容失败')); }}>复制全部信息</DropdownMenuItem>
+          {options.filter(item => !item.hidden).map(item =>
+            <DropdownMenuItem key={item.label} onSelect={() => { void copyData(item.value).catch(() => toast.error('获取复制内容失败')); }}>
+              复制{item.label}
+            </DropdownMenuItem>)}
+        </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+    </DropdownMenuSub>;
   }
 
   return (

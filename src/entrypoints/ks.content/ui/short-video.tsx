@@ -1,11 +1,11 @@
 import { CopyButton, CopyOption } from "@/components/copy/copy-button";
 import { visionVideoDetail, VisionVideoDetail } from "../api/vision-video-detail";
-import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { commentListQuery } from "../api/comment-list-query";
 import { throttle } from "lodash";
 import { getPostMedias } from "../utils/media";
-import { Logo } from "@/components/logo";
+import { ToolMenu } from "@/components/common/tool-menu";
 
 export type Props = {
     photoId: string;
@@ -70,12 +70,11 @@ export const Component = ({ photoId }: Props) => {
         });
     }
 
-    return (<div className="flex gap-4">
-        <Logo />
-        <Button size="sm" className="text-xs h-8 px-2" onClick={throttle(handlerDownloadVideo, 2000)}>下载视频</Button>
-        <CopyButton size="sm" className="text-xs h-8 px-2" options={copyOptions} getData={getVideoDetail}>复制视频信息</CopyButton>
-        <Button size="sm" className="text-xs h-8 px-2" onClick={throttle(handleOpenDialog, 2000)}>导出评论</Button>
-    </div>);
+    return (<ToolMenu>
+        <DropdownMenuItem onSelect={throttle(handlerDownloadVideo, 2000)}>下载视频</DropdownMenuItem>
+        <CopyButton submenu options={copyOptions} getData={getVideoDetail}>复制视频信息</CopyButton>
+        <DropdownMenuItem onSelect={throttle(handleOpenDialog, 2000)}>导出评论</DropdownMenuItem>
+    </ToolMenu>);
 };
 
 export default defineSocialMediaCopilotUi({

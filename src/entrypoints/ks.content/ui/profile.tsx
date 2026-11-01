@@ -1,6 +1,6 @@
 import { CopyButton, CopyOption } from "@/components/copy/copy-button";
-import { Logo } from "@/components/logo";
-import { Button } from "@/components/ui/button";
+import { ToolMenu } from "@/components/common/tool-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { throttle } from "lodash";
 import { visionProfile, VisionProfileResult } from "../api/vision-profile";
 
@@ -55,11 +55,10 @@ const Component = ({ userId }: Props) => {
         });
     }
 
-    return (<div className="flex gap-4">
-        <Logo />
-        <CopyButton size="sm" options={copyOptions} getData={getUserInfo}>复制达人信息</CopyButton>
-        <Button size="sm" onClick={throttle(handlerOpenExportDialog, 2000)}>导出视频数据</Button>
-    </div>);
+    return (<ToolMenu>
+        <CopyButton submenu options={copyOptions} getData={getUserInfo}>复制达人信息</CopyButton>
+        <DropdownMenuItem onSelect={throttle(handlerOpenExportDialog, 2000)}>导出视频数据</DropdownMenuItem>
+    </ToolMenu>);
 };
 
 export default defineSocialMediaCopilotUi({

@@ -3,11 +3,22 @@
 **English** | [简体中文](./PRIVACY.CN.md)
 
 **Effective date: August 25, 2026**  
-**Last updated: August 28, 2026**
+**Last updated: November 1, 2026**
 
-Social Media Copilot - Open Source Edition (the "Extension") is an open-source Chrome extension that helps users organize social media content, creator profiles, and engagement data they are authorized to access on Xiaohongshu, Douyin, and Kuaishou. It also allows users to export this data locally as Excel files or download selected images and videos to their devices.
+Social Media Copilot - Open Source Edition (the "Extension") is an open-source Chrome extension that helps users organize social media content, creator profiles, and engagement data they are authorized to access on Xiaohongshu, Douyin, Kuaishou, and Bilibili. It also allows users to export this data locally as Excel files or download selected images and videos to their devices.
 
-This Privacy Policy explains what data the Extension handles, why it is handled, where it goes, and the controls available to users. The source code of the Extension is publicly available at <https://github.com/iszhouhua/social-media-copilot>.
+This Privacy Policy explains what data the Extension handles, why it is handled, where it goes, and the controls available to users. The source code of the Extension is publicly available at <https://github.com/LIBERSEEK/OpenSeek-EXTENSIONS>.
+
+The local OPENSEEK integration also includes ImageLens image-to-prompt features on ordinary HTTP/HTTPS pages. Existing social collection purposes remain unchanged; the following supplement describes image analysis.
+
+### Image Analysis Supplement
+
+- Ordinary webpages load image hover controls and the region-selection UI. Images, cropped screenshots or prompts are sent to the configured model provider only when the user requests analysis or generation. Social platform login information is not sent to model providers.
+- API keys, provider URLs, model names and preferences stay in this extension's `chrome.storage.local`. Settings are not automatically shared with the standalone ImageLens extension. Uninstalling the extension removes its local data.
+- Analysis reads the selected image and its alt text. If direct image access fails, the visible tab is captured and the selected area is cropped locally before transmission. Direct model requests do not include the page URL. If the upstream proxy mode is manually enabled, that configured proxy also receives the selected image URL, page URL and alt text.
+- Generated images are temporarily stored in local IndexedDB for viewing and downloading. Analysis results are cached in page memory until refresh.
+- `<all_urls>` host permission enables access to selected webpage images, custom model endpoints and screenshot fallback. The image content script matches only HTTP/HTTPS pages. `storage` saves settings; `contextMenus` adds analysis and region-selection actions.
+- Provider retention and billing follow the user's chosen service provider policies. The developer does not operate a server receiving these requests.
 
 ## 1. Data Handled by the Extension
 
@@ -58,9 +69,9 @@ The Extension does not use data for advertising, profiling, cross-site tracking,
 
 ## 3. Data Transmission and Sharing
 
-To complete an operation actively requested by the user, the Extension communicates over HTTPS with the relevant social media platform and its content-delivery or media-resource domains. For example, data for a Xiaohongshu task is sent only to Xiaohongshu-related services, data for a Douyin task is sent only to Douyin-related services, and data for a Kuaishou task is sent only to Kuaishou-related services.
+To complete an operation actively requested by the user, the Extension communicates over HTTPS with the relevant social media platform and its content-delivery or media-resource domains. For example, data for a Xiaohongshu task is sent only to Xiaohongshu-related services, data for a Douyin task is sent only to Douyin-related services, and data for a Kuaishou task is sent only to Kuaishou-related services, and Bilibili tasks contact Bilibili and its media services. The extension resolves Bilibili short links through b23.tv to identify the selected video.
 
-Other than platform communications necessary to provide the requested functionality:
+Other than these platform communications and user-configured model communications described in the supplement:
 
 - The Extension does not use a developer-operated data collection server;
 - The Extension does not integrate advertising, analytics, or user-behavior tracking services;
@@ -83,7 +94,7 @@ The Extension may use the following Chrome extension permissions:
 - **activeTab**: Temporarily identifies the active page and communicates with the Extension's features on that page after the user clicks the Extension icon;
 - **downloads**: Saves locally generated Excel files or media selected by the user after the user initiates a download;
 - **scripting**: Executes Extension functionality necessary for same-origin data requests and request signing on supported platform pages;
-- **Host permissions**: Loads Extension functionality, accesses user-specified data, and sends requests to the relevant platform only on Xiaohongshu, Douyin, Kuaishou, and their necessary service domains.
+- **Host permissions**: Social collection runs on supported Xiaohongshu, Douyin, Kuaishou and Bilibili pages. See the supplement above for image analysis page and endpoint access.
 
 These permissions are used only for the Extension's disclosed single purpose. The developer aims to limit permissions to the narrowest scope necessary to provide existing features.
 
@@ -123,5 +134,13 @@ If the Extension's data-handling practices change, this Privacy Policy will be u
 
 For questions about this Privacy Policy or the Extension's data-handling practices, contact the developer through:
 
-- GitHub Issues: <https://github.com/iszhouhua/social-media-copilot/issues>
+- GitHub Issues: <https://github.com/LIBERSEEK/OpenSeek-EXTENSIONS/issues>
 
+
+## BOFT.AI sign-in and model requests
+
+Optional BOFT.AI sign-in uses Chrome's `identity` permission, PKCE and the `identity:read auto_keys:issue` scopes. The extension verifies account identity and obtains an AUTO Key bound to its OAuth client. Account email, subject, client registration and AUTO Key are stored in extension-local storage. The temporary OAuth token is revoked after issuance and is not persisted. Webpage scripts do not receive these credentials.
+
+Authorization and account requests go to `https://supply.boft.ai`. User-triggered model discovery, image analysis and generation go to `https://api-direct.boft.ai`. Selected images, prompts and generation parameters are sent to BOFT.AI for the requested operation. Manually entered BOFT API keys also remain local. Model requests may incur charges on the BOFT.AI account.
+
+Disconnect clears the local OAuth credential; manually configured keys remain independent. Revoke the server-side AUTO Key in BOFT.AI account management. Reauthorizing after losing the local key may recover and replace only this OAuth client's bound key.

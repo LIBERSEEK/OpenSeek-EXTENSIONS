@@ -12,9 +12,17 @@ export const Item = (props: ItemProp) => {
   const { icon: Icon, title, label, className, iconClassName, ...restProps } = props;
 
   return (<div
-    className={cn("h-8 w-full px-4 inline-flex items-center whitespace-nowrap text-sm font-medium justify-start hover:cursor-pointer hover:bg-primary hover:text-primary-foreground", className)}
+    className={cn("popup-item h-9 w-full px-4 inline-flex items-center whitespace-nowrap text-[13px] font-medium justify-start hover:cursor-pointer", className)}
+    role="button"
+    tabIndex={0}
+    onKeyDown={(event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        restProps.onClick?.(event as unknown as React.MouseEvent<HTMLDivElement>);
+      }
+    }}
     {...restProps}>
-    {typeof Icon === "string" ? <img src={Icon} className={cn("mr-2 h-4 w-4", iconClassName)} alt={title} /> : <Icon className={cn("mr-2 h-4 w-4", iconClassName)} />}
+    {typeof Icon === "string" ? <img src={Icon} className={cn("mr-3 h-4 w-4 rounded-[5px]", iconClassName)} alt="" /> : <Icon className={cn("mr-3 h-4 w-4", iconClassName)} />}
     <span className="overflow-ellipsis overflow-hidden flex-1">{title}</span>
     {label}
   </div>);
@@ -33,8 +41,8 @@ export const CollapsibleItem = (props: CollapsibleItemProp) => {
     <CollapsibleTrigger asChild>
       <Item {...restProps} label={label ?? (isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)} />
     </CollapsibleTrigger>
-    <CollapsibleContent className="flex flex-col gap-2 pl-4">
-      {items ? items.map(item => <Item {...item} />) : children}
+    <CollapsibleContent className="popup-subitem flex flex-col gap-1 pl-4 py-1">
+      {items ? items.map((item, index) => <Item key={`${item.title}-${index}`} {...item} />) : children}
     </CollapsibleContent>
   </Collapsible>);
 };

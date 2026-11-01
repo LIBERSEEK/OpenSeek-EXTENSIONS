@@ -1,6 +1,6 @@
 import { CopyButton, CopyOption } from "@/components/copy/copy-button";
-import { Logo } from "@/components/logo";
-import { Button } from "@/components/ui/button";
+import { ToolMenu } from "@/components/common/tool-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { defineSocialMediaCopilotUi } from "@/utils/ui";
 import { throttle } from "lodash";
 import { toast } from "sonner";
@@ -74,19 +74,18 @@ const Component = (props: {
     value: "desc"
   }];
 
-  return (<>
-    <Logo />
-    <Button size="sm" onClick={throttle(downloadMedia, 3000)}>下载笔记视频/图片</Button>
-    <CopyButton size="sm" options={copyOptions} getData={getNoteCard}>复制笔记信息</CopyButton>
-    <Button size="sm" onClick={throttle(handleOpenDialog, 2000)}>导出评论</Button>
-  </>);
+  return (<ToolMenu>
+    <DropdownMenuItem onSelect={throttle(downloadMedia, 3000)}>下载笔记视频/图片</DropdownMenuItem>
+    <CopyButton submenu options={copyOptions} getData={getNoteCard}>复制笔记信息</CopyButton>
+    <DropdownMenuItem onSelect={throttle(handleOpenDialog, 2000)}>导出评论</DropdownMenuItem>
+  </ToolMenu>);
 };
 
 export default defineSocialMediaCopilotUi({
   name: 'social-media-copilot-xhs-explore',
   position: "inline",
   append: "after",
-  className: "flex px-6 pb-[24px] gap-4",
+  className: "inline-flex px-6 pb-2",
   matches: ["*://www.xiaohongshu.com/explore/*"],
   anchor: "#noteContainer > div.interaction-container > div.author-container",
   render: ({ root, remove }) => {

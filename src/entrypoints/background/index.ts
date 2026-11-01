@@ -5,7 +5,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { registerImageLensBackground } from '@/integrations/image-lens/background.js';
+import { resolveShortUrl } from '../bili.content/api/request';
+
 export default defineBackground(() => {
+    registerImageLensBackground();
+    onMessage('resolveBilibiliUrl', ({ data }) => resolveShortUrl(data.url));
+    onMessage('selectImageRegion', async ({ sender }) => {
+        if (sender.tab?.id !== undefined) {
+            await browser.tabs.sendMessage(sender.tab.id, { type: 'start-region-selection' }, { frameId: 0 });
+        }
+    });
+
+    onMessage('openImageSettings', () => browser.runtime.openOptionsPage());
     onMessage('openPopup', () => {
         return browser.action.openPopup();
     });
@@ -43,6 +55,6 @@ export default defineBackground(() => {
     });
 
     onMessage('download', ({ data }) => {
-        return browser.downloads.download(data);
+        return browser.downloads.download({ url: data.url, filename: data.filename });
     });
 });

@@ -54,6 +54,7 @@ export abstract class TaskProcessor<P = any, T = any> {
             return this.dataCache.get(config.key) as any;
         }
         await sleep((this.condition.requestInterval ?? 1) * 1000);
+        if (this.signal?.aborted) throw new Error('任务终止');
         const result = await func(...args);
         if (result) {
             this.dataCache.set(config.key, result);
@@ -75,5 +76,5 @@ export abstract class TaskProcessor<P = any, T = any> {
      * 获取媒体文件下载选项
      * @param mediaTypes 需要下载的媒体类型
      */
-    abstract getMediaDownloadOptions(mediaTypes: string[]): TaskDownloadOption[];
+    abstract getMediaDownloadOptions(mediaTypes: string[]): TaskDownloadOption[] | Promise<TaskDownloadOption[]> | AsyncIterable<TaskDownloadOption>;
 }

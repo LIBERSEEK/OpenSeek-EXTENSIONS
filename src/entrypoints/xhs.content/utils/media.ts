@@ -6,10 +6,13 @@ export function getPostMedias(noteCard: XhsAPI.NoteCard, mediaTypes: string[] = 
     const name = `${noteCard.note_id}/` + getSafeFilename(noteCard.title || noteCard.desc || '无内容');
     if (noteCard.type === 'video') {
         if (mediaTypes.includes('video')) {
-            list.push({
-                filename: `${name}.mp4`,
-                url: getVideoUrl(noteCard.video),
-            });
+            const url = getVideoUrl(noteCard.video);
+            if (url) {
+                list.push({
+                    filename: `${name}.mp4`,
+                    url,
+                });
+            }
         }
         if (mediaTypes.includes('cover')) {
             const value = noteCard.image_list?.[0];

@@ -20,7 +20,7 @@ export function generateExcelDownloadOption(datas: Array<Array<any>>, name: stri
     const buffer = XLSX.write(workbook, { type: "buffer" });
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     return {
-        filename: `【社媒助手】${getSafeFilename(name)}-${moment().format("YYYYMMDD-HHmmss")}.xlsx`,
+        filename: `【OPENSEEK】${getSafeFilename(name)}-${moment().format("YYYYMMDD-HHmmss")}.xlsx`,
         url: URL.createObjectURL(blob)
     }
 }

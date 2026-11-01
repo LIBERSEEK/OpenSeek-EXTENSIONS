@@ -1,6 +1,6 @@
 import { CopyButton, CopyOption } from "@/components/copy/copy-button";
-import { Logo } from "@/components/logo";
-import { Button } from "@/components/ui/button";
+import { ToolMenu } from "@/components/common/tool-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { defineSocialMediaCopilotUi } from "@/utils/ui";
 import { throttle } from "lodash";
 import { user } from "../api";
@@ -58,17 +58,16 @@ const Component = ({ userId }: {
         value: "signature"
     }];
 
-    return (<>
-        <Logo />
-        <CopyButton size="sm" options={copyOptions} getData={getUserInfo}>复制达人信息</CopyButton>
-        <Button size="sm" onClick={throttle(handlerOpenExportDialog, 2000)}>导出视频数据</Button>
-    </>);
+    return (<ToolMenu>
+        <CopyButton submenu options={copyOptions} getData={getUserInfo}>复制达人信息</CopyButton>
+        <DropdownMenuItem onSelect={throttle(handlerOpenExportDialog, 2000)}>导出视频数据</DropdownMenuItem>
+    </ToolMenu>);
 };
 
 export default defineSocialMediaCopilotUi({
     name: 'social-media-copilot-dy-user',
     position: "inline",
-    className: "max-w-[1208px] my-[20px] mx-auto flex gap-4",
+    className: "max-w-[1208px] my-2 mx-auto flex",
     anchor: "//div[@data-e2e='user-info']/..",
     append: "after",
     matches: ["*://www.douyin.com/user/*"],

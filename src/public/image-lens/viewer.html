@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="../icon/32.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Lens Viewer</title>
+    <link rel="stylesheet" href="./viewer.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z" /></svg>
+          </span>
+          <strong id="viewer-eyebrow">Image Lens</strong>
+        </div>
+        <div class="actions">
+          <button id="copy-prompt" class="btn" type="button">Copy Prompt</button>
+          <button id="download-images" class="btn btn-primary" type="button">Download Images</button>
+        </div>
+      </header>
+
+      <section class="prompt-card">
+        <h1 id="viewer-heading">Prompt</h1>
+        <p id="prompt" class="prompt">Loading...</p>
+      </section>
+
+      <section id="gallery" class="gallery"></section>
+    </main>
+
+    <script src="./i18n.js"></script>
+    <script src="./viewer.js"></script>
+  </body>
+</html>

@@ -108,7 +108,10 @@ declare namespace XhsAPI {
 
     interface VideoInfo {
         media: {
-            stream: any;
+            stream: {
+                h265?: Array<{ size: number; master_url: string }>;
+                h_265?: Array<{ size: number; master_url: string }>;
+            };
             video_id: number;
             video: any;
         };

@@ -1,6 +1,6 @@
 import { CopyButton, CopyOption } from "@/components/copy/copy-button";
-import { Logo } from "@/components/logo";
-import { Button } from "@/components/ui/button";
+import { ToolMenu } from "@/components/common/tool-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { createSocialMediaCopilotUi, defineSocialMediaCopilotUi } from "@/utils/ui";
 import { throttle } from "lodash";
 import { toast } from "sonner";
@@ -84,19 +84,18 @@ export const Component = (props: {
     value: "desc"
   }];
 
-  return (<>
-    <Logo />
-    <Button size="sm" className="text-xs h-8 px-2" onClick={throttle(handlerDownloadVideo, 2000)}>{props?.type === "note" ? "下载图集" : "下载无水印视频"}</Button>
-    <CopyButton size="sm" className="text-xs h-8 px-2" options={copyOptions} getData={getAweme}>复制视频信息</CopyButton>
-    <Button size="sm" className="text-xs h-8 px-2" onClick={throttle(handleOpenDialog, 2000)}>导出评论</Button>
-    {props?.isMix && <Button size="sm" className="text-xs h-8 px-2" onClick={throttle(handlerDownloadMix, 2000)}>导出合集</Button>}
-  </>);
+  return (<ToolMenu>
+    <DropdownMenuItem onSelect={throttle(handlerDownloadVideo, 2000)}>{props?.type === "note" ? "下载图集" : "下载无水印视频"}</DropdownMenuItem>
+    <CopyButton submenu options={copyOptions} getData={getAweme}>复制视频信息</CopyButton>
+    <DropdownMenuItem onSelect={throttle(handleOpenDialog, 2000)}>导出评论</DropdownMenuItem>
+    {props?.isMix && <DropdownMenuItem onSelect={throttle(handlerDownloadMix, 2000)}>导出合集</DropdownMenuItem>}
+  </ToolMenu>);
 };
 
 const ui = defineSocialMediaCopilotUi({
   name: 'social-media-copilot-dy-video',
   position: "inline",
-  className: "z-50 flex gap-4 bg-transparent mr-8",
+  className: "inline-flex bg-transparent mr-2",
   isolateEvents: true,
   anchor: () => {
     const activeVideo = document.querySelectorAll('div[data-e2e="feed-active-video"] xg-right-grid');

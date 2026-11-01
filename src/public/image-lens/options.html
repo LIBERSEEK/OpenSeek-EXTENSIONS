@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>千寻助手 · 图透镜设置</title>
+    <link rel="icon" href="../icon/32.png" />
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <main class="main">
+      <header class="page-head">
+        <div class="brand"><img src="../icon/48.png" width="32" height="32" alt="" /><span id="brand-name">千寻助手</span><span class="brand-divider">/</span><h1 id="settings-title">图透镜设置</h1></div>
+        <div class="save-state"><span id="autosave-note">修改自动保存</span><p id="status" class="status" role="status" aria-live="polite"></p></div>
+      </header>
+      <form id="settings-form" novalidate>
+        <section class="section" id="connection-section" aria-labelledby="connection-title">
+          <header class="section-head"><h2 id="connection-title">AI 连接</h2><p id="connection-description">识图与生图共用，配置一次即可。</p></header>
+          <div class="card">
+            <label class="row"><span class="row-label" id="prompt-provider-label">服务商</span><span class="row-control"><select name="promptProvider" aria-labelledby="prompt-provider-label"></select></span></label>
+            <label class="row" id="prompt-key-row"><span class="row-label"><span id="prompt-api-key-label">API Key</span><small id="local-storage-note">仅保存在本机</small></span><span class="row-control key-field"><input name="promptApiKey" type="password" autocomplete="off" spellcheck="false" /><button class="key-toggle" data-key-for="promptApiKey" type="button">显示</button></span></label>
+            <details class="fold" id="prompt-advanced"><summary id="custom-endpoint-label">自定义接口地址</summary><label class="row"><span class="row-label" id="prompt-base-url-label">Base URL</span><span class="row-control"><input name="promptBaseUrl" type="url" autocomplete="off" spellcheck="false" /></span></label></details>
+            <div class="boft-account" id="boft-account" aria-labelledby="boft-title">
+              <div class="account-heading"><div><h3 id="boft-title">BOFT.AI</h3><p id="boft-account-status" class="note" role="status" aria-live="polite"></p></div><div class="boft-actions"><button id="boft-connect" type="button"></button><button id="boft-disconnect" type="button" hidden></button></div></div>
+              <details class="fold" id="boft-manual"><summary id="boft-manual-label">改用 API Key</summary><label class="row"><span class="row-label" id="boft-key-label">BOFT.AI API Key</span><span class="row-control key-field"><input name="boftApiKey" type="password" autocomplete="off" spellcheck="false" /><button class="key-toggle" data-key-for="boftApiKey" type="button">显示</button></span></label></details>
+              <p id="boft-feedback" class="note" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+        </section>
+        <section class="section" id="models-section" aria-labelledby="models-title">
+          <header class="section-head model-heading"><h2 id="models-title">模型</h2><button id="boft-models" class="link-button" type="button">读取可用模型</button></header>
+          <datalist id="boft-model-list"></datalist>
+          <div class="card">
+            <label class="row"><span class="row-label" id="prompt-model-label">识图模型</span><span class="row-control"><input name="promptModel" list="boft-model-list" type="text" spellcheck="false" /></span></label>
+            <label class="row switch-row"><span class="row-label" id="image-generation-enabled-label">启用生图</span><input class="switch" name="imageGenerationEnabled" type="checkbox" /></label>
+            <div id="image-settings-group">
+              <label class="row"><span class="row-label"><span id="image-model-label">生图模型</span><small id="image-model-help">需支持图片输出</small></span><span class="row-control"><input name="imageModel" list="boft-model-list" type="text" spellcheck="false" /></span></label>
+              <details class="fold" id="image-connection-settings">
+                <summary id="image-connection-summary">生图连接 · 共用识图配置</summary>
+                <label class="row switch-row"><span class="row-label"><span id="separate-image-connection-label">使用独立连接</span><small id="separate-image-connection-note">仅在生图需要其他服务商或密钥时开启</small></span><input class="switch" name="separateImageConnection" type="checkbox" /></label>
+                <div id="image-connection-fields" hidden>
+                  <label class="row"><span class="row-label" id="image-provider-label">生图服务商</span><span class="row-control"><select name="imageProvider" aria-labelledby="image-provider-label"></select></span></label>
+                  <label class="row"><span class="row-label" id="image-api-key-label">API Key</span><span class="row-control key-field"><input name="imageApiKey" type="password" autocomplete="off" spellcheck="false" /><button class="key-toggle" data-key-for="imageApiKey" type="button">显示</button></span></label>
+                  <label class="row"><span class="row-label" id="image-base-url-label">Base URL</span><span class="row-control"><input name="imageBaseUrl" type="url" autocomplete="off" spellcheck="false" /></span></label>
+                </div>
+              </details>
+            </div>
+          </div>
+        </section>
+        <details class="preferences" id="analysis-prompt-settings">
+          <summary id="analysis-prompt-title">识图提示词</summary>
+          <div class="card prompt-editor">
+            <label for="analysis-instructions" id="analysis-instructions-label">识图指令</label>
+            <p class="note" id="analysis-instructions-note">自定义识别重点、描述风格和细节要求。结构化返回格式由插件维护。</p>
+            <textarea id="analysis-instructions" name="analysisInstructions" rows="10" spellcheck="false" aria-describedby="analysis-instructions-note analysis-instructions-hint"></textarea>
+            <div class="prompt-editor-actions"><button id="reset-analysis-instructions" class="link-button" type="button">恢复默认</button><span id="analysis-instructions-state" class="note"></span></div>
+            <p class="note" id="analysis-instructions-hint">修改自动保存，下次识图生效；清空则使用默认指令。</p>
+          </div>
+        </details>
+        <details class="preferences" id="preferences">
+          <summary id="preferences-title">使用偏好</summary>
+          <div class="card">
+            <label class="row switch-row"><span class="row-label" id="auto-analyze-label">打开面板时自动识图</span><input class="switch" name="autoAnalyze" type="checkbox" /></label>
+            <label class="row switch-row"><span class="row-label" id="enable-chinese-recognition-label">生成中文提示词</span><input class="switch" name="enableChineseRecognition" type="checkbox" /></label>
+            <label class="row"><span class="row-label" id="ui-language-label">界面语言</span><span class="row-control"><select name="uiLanguage"></select></span></label>
+          </div>
+        </details>
+      </form>
+      <footer class="page-footer">
+        <button id="open-doc" class="link-button" type="button">使用文档</button>
+        <details class="about"><summary id="about-label">关于与隐私</summary><div class="about-content"><p><span id="about-version-label">版本</span> <span id="about-version" class="mono">-</span></p><div class="links"><a id="about-github" href="https://github.com/LIBERSEEK/OpenSeek-EXTENSIONS" target="_blank" rel="noopener">GitHub</a><a id="about-upstream" href="https://github.com/kevinchin12/ImageLens" target="_blank" rel="noopener">ImageLens (MIT)</a><a id="about-privacy" href="https://github.com/LIBERSEEK/OpenSeek-EXTENSIONS/blob/develop/PRIVACY.CN.md" target="_blank" rel="noopener">隐私政策</a></div><p id="options-note" class="note"></p><p id="about-credit" class="note">© 2026 LIBERSEEK · ImageLens (MIT)</p></div></details>
+      </footer>
+    </main>
+    <script src="./i18n.js"></script>
+    <script src="./options.js"></script>
+  </body>
+</html>

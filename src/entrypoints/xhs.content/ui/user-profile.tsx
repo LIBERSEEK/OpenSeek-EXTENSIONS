@@ -1,6 +1,6 @@
 import { CopyButton, CopyOption } from "@/components/copy/copy-button";
-import { Logo } from "@/components/logo";
-import { Button } from "@/components/ui/button";
+import { ToolMenu } from "@/components/common/tool-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { defineSocialMediaCopilotUi } from "@/utils/ui";
 import { webV1UserOtherinfo } from "../api/user";
 
@@ -43,17 +43,16 @@ const Component = (props: {
       value: "basic_info.desc",
     }];
 
-  return (<>
-    <Logo />
-    <CopyButton size="sm" options={copyOptions} getData={getUserInfo}>复制博主信息</CopyButton>
-    <Button size="sm" onClick={handlerOpenExportDialog}>导出笔记数据</Button>
-  </>);
+  return (<ToolMenu>
+    <CopyButton submenu options={copyOptions} getData={getUserInfo}>复制博主信息</CopyButton>
+    <DropdownMenuItem onSelect={handlerOpenExportDialog}>导出笔记数据</DropdownMenuItem>
+  </ToolMenu>);
 };
 
 export default defineSocialMediaCopilotUi({
   name: 'social-media-copilot-xhs-user-profile',
   position: "inline",
-  className: "flex pt-[20px] gap-4",
+  className: "inline-flex pt-2",
   matches: ["*://www.xiaohongshu.com/user/profile/*"],
   anchor: "#userPageContainer .user-info .info-part .info",
   render: ({ root, remove }) => {

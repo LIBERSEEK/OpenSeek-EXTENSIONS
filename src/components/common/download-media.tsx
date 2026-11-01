@@ -25,6 +25,7 @@ export function DownloadMedia(props: {
 }) {
     const { processor, children } = props;
     const [openDialog, setOpenDialog] = useState(false);
+    const [preparing, setPreparing] = useState(false);
 
     const form = useForm<FormSchema>({
         resolver: zodResolver(formSchema),
@@ -32,16 +33,26 @@ export function DownloadMedia(props: {
     });
 
     const handleSubmit = async (values: FormSchema) => {
-        const options = processor.getMediaDownloadOptions(values.mediaTypes);
-        if (!options?.length) {
-            toast.warning("相关内容为空，无法下载");
-            return;
+        if (preparing) return;
+        setPreparing(true);
+        try {
+            const options = await processor.getMediaDownloadOptions(values.mediaTypes);
+            let count = 0;
+            for await (const option of options) {
+                await sendMessage('download', option);
+                count++;
+            }
+            if (!count) {
+                toast.warning("相关内容为空，无法下载");
+                return;
+            }
+            toast.success("已加入下载队列");
+            setOpenDialog(false);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : '下载失败，请重试');
+        } finally {
+            setPreparing(false);
         }
-        for (const option of options) {
-            await sendMessage('download', { filename: option.filename, url: option.url });
-        }
-        toast.success("下载成功");
-        setOpenDialog(false);
     }
 
 
@@ -105,7 +116,7 @@ export function DownloadMedia(props: {
                     </form>
                 </Form>
                 <DialogFooter>
-                    <Button onClick={form.handleSubmit(handleSubmit)} className="w-full">开始下载</Button>
+                    <Button disabled={preparing} onClick={form.handleSubmit(handleSubmit)} className="w-full">{preparing ? '正在准备下载…' : '开始下载'}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
